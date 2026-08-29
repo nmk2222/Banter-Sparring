@@ -161,7 +161,7 @@
 
   <script>
     const SCENARIOS = {
-      level1: { instructions: "Respond in 1 punchy, natural sentence. Match casual low-stakes banter.", settings: [
+      level1: { instructions: "Respond in 1 natural conversational sentence. Match casual low-stakes banter.", settings: [
         "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every single order.",
         "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
         "Standing in a long line at a popular Sunday morning bagel bakery watching the chaotic kitchen staff.",
@@ -370,7 +370,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Gemini 3.6 Flash Dispatcher with zero-budget thinking tokens
+    // Complete Output Multi-Part Concatenation
     async function executeModelCall(prompt, isJson = false, systemInstructionText = "") {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -386,11 +386,8 @@
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: 1000,
-          temperature: isJson ? 0.1 : 0.75,
-          responseMimeType: isJson ? "application/json" : "text/plain",
-          thinkingConfig: {
-            thinkingBudget: 0
-          }
+          temperature: isJson ? 0.1 : 0.8,
+          responseMimeType: isJson ? "application/json" : "text/plain"
         }
       };
 
@@ -415,12 +412,20 @@
         throw new Error(data.error?.message || `HTTP ${resp.status}`);
       }
 
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawText) {
+      const candidate = data?.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+      
+      // Concatenate all text parts excluding internal thought tokens
+      const fullText = parts
+        .filter(p => !p.thought)
+        .map(p => p.text || '')
+        .join('') || parts.map(p => p.text || '').join('');
+
+      if (!fullText.trim()) {
         throw new Error("Empty response received.");
       }
 
-      let clean = rawText.trim();
+      let clean = fullText.trim();
       clean = clean.replace(/^(Option\s*\d+:?\s*\*?|\*|\"|Partner:\s*)+/gi, "");
       clean = clean.replace(/(\"|\*)+$/g, "").trim();
 
@@ -503,7 +508,7 @@ Location Setting: ${currentSetting}
 Behavioral Style: ${pool.instructions}
 RULES:
 1. Speak in 1-2 complete, authentic conversational sentences.
-2. Never output meta-commentary, options, bullet points, or list structures.
+2. Complete your thought fully—do not stop mid-sentence.
 3. Output ONLY your direct spoken line.`;
 
       const personaPrompt = `Conversation History:\n${dialogueStr}\n\nRespond to the last line from 'Me':`;
