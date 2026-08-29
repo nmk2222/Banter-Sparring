@@ -19,8 +19,8 @@ client = genai.Client(api_key=clean_key)
 
 # Failover models to eliminate 503 errors completely
 MODEL_CASCADE = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
+    "gemini-3.6-flash",
+    "gemini-3.1-pro-preview",
 ]
 
 def fast_call(prompt, is_json=False):
