@@ -13,6 +13,8 @@ if not api_key:
     st.error("API Key missing. Please add GEMINI_API_KEY in Streamlit App Settings -> Secrets.")
     st.stop()
 
+client = genai.Client(api_key=api_key)
+
 # Expanded Scenario Prompts
 SCENARIOS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
@@ -32,7 +34,7 @@ SCENARIOS = {
         "instructions": "Keep replies extremely brief (1-2 punchy sentences). Match the high enthusiasm. React well to situational comments about the crowd, the band, or terrible drink prices."
     },
     "Level 5: The Fitness Class / Gym (Low Friction, Non-Intrusive)": {
-        "context": "You are wiping down equipment after a challenging group fitness workout (CrossFit, Pilates, or lifting area), slightly out of breath.",
+        "context": "You are wiping down equipment after a challenging group fitness workout, slightly out of breath.",
         "instructions": "Initially give brief, focused replies. You appreciate self-amused commiseration about the brutal workout, but dislike overly eager or try-hard pickup attempts. Only warm up if the banter is low-pressure, grounded, and concise."
     },
     "Level 6: The Lounge (Flirtatious & High Polarity)": {
@@ -44,7 +46,6 @@ SCENARIOS = {
         "instructions": "Start with concise, slightly dry/skeptical replies. Only warm up if the user uses genuine warmth, self-amusement, and observational play."
     }
 }
-}
 
 # State Management
 if "level" not in st.session_state:
@@ -55,14 +56,6 @@ if "turn_count" not in st.session_state:
     st.session_state.turn_count = 0
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
-
-st.title("🎙️ Charisma & Banter Lab")
-st.caption("Audio-first dynamic conversational sparring with instant charisma scoring.")
-
-selected_level = st.selectbox("Select Training Scenario:", list(SCENARIOS.keys()))
-if selected_level != st.session_state.level:
-    st.session_state.level = selected_level
-    st.session_state.transcript = []
     st.session_state.turn_count = 0
     st.session_state.evaluation = None
     st.rerun()
