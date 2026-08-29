@@ -21,8 +21,6 @@ client = genai.Client(api_key=clean_key)
 MODEL_CASCADE = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro"
 ]
 
 def fast_call(prompt, is_json=False):
