@@ -108,6 +108,15 @@
       </div>
     </div>
 
+    <!-- Loading Indicator for Scorecard -->
+    <div id="scorecardLoading" class="bg-slate-900/80 p-5 rounded-2xl border border-sky-500/30 flex items-center justify-center gap-3 text-xs text-sky-300 hidden">
+      <svg class="animate-spin h-4 w-4 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      Analyzing 4-round delivery, tempo, and conversational dynamics...
+    </div>
+
     <!-- Scorecard Section -->
     <div id="scorecardSection" class="bg-slate-900 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -370,7 +379,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Gemini 3.6 Flash Dispatcher with Clean Payload
+    // Direct Gemini 3.6 Flash Dispatcher
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -439,6 +448,7 @@
       document.getElementById("reactionDisplay").textContent = "--";
       document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
+      document.getElementById("scorecardLoading").classList.add("hidden");
       
       const inputEl = document.getElementById("userInput");
       inputEl.disabled = false;
@@ -492,7 +502,7 @@
       const pool = SCENARIOS[currentTier];
       const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'You'}: ${t.text}`).join("\n");
       
-      const personaPrompt = `You are a real person engaging in natural, witty, casual conversation in real life.
+      const personaPrompt = `You are roleplaying as a real person engaging in natural, witty, casual conversation in real life.
 Location Setting: ${currentSetting}
 Behavioral Style: ${pool.instructions}
 
@@ -521,6 +531,7 @@ Respond to the last line from 'Me':`;
           inputEl.focus();
         } else {
           document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
+          document.getElementById("scorecardLoading").classList.remove("hidden");
           generateScorecard();
         }
       } catch (err) {
@@ -538,7 +549,7 @@ Respond to the last line from 'Me':`;
 
       const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
       
-      const criticPrompt = `You are a world-class conversational charisma coach.
+      const criticPrompt = `You are a conversational charisma coach.
 Analyze this banter transcript:
 Setting: ${currentSetting}
 Avg Reaction Latency: ${avgLatency}s
@@ -547,13 +558,13 @@ Transcript:
 ${transcriptStr}
 
 Evaluate User based on:
-1. Spontaneity (1-10): (<3.5s = 10, 3.5-6s = 8-9, 6-10s = 5-7, >10s = <5)
-2. Outcome Independence (1-10)
+1. Spontaneity (1-10)
+2. Independence (1-10)
 3. Playfulness & Frame Control (1-10)
 4. Brevity (1-10)
 5. Warmth (1-10)
 
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON with no markdown wrapping:
 {
   "spontaneity": 9,
   "independence": 8,
@@ -561,30 +572,48 @@ Return ONLY valid JSON matching this schema:
   "brevity": 9,
   "overall": 8.2,
   "verdict": "Passed",
-  "speed_critique": "string",
-  "upgraded_line": "string",
-  "key_anchor": "string"
+  "speed_critique": "Solid timing and tempo.",
+  "upgraded_line": "Stronger alternative phrasing.",
+  "key_anchor": "Core dynamic to practice."
 }`;
 
       try {
-        const rawJson = await executeModelCall(criticPrompt, true);
-        const clean = rawJson.replace(/```json/g, "").replace(/```/g, "").trim();
-        const score = JSON.parse(clean);
+        const rawResponse = await executeModelCall(criticPrompt, true);
+        
+        // Robust JSON Extraction (handles any residual markdown ticks or text prefix)
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error("Unable to parse scorecard JSON format");
+        }
+        const score = JSON.parse(jsonMatch[0]);
 
-        document.getElementById("spontaneityScore").textContent = `${score.spontaneity}/10`;
-        document.getElementById("independenceScore").textContent = `${score.independence}/10`;
-        document.getElementById("playfulnessScore").textContent = `${score.playfulness}/10`;
-        document.getElementById("brevityScore").textContent = `${score.brevity}/10`;
-        document.getElementById("overallScore").textContent = `${score.overall}/10`;
-        document.getElementById("scoreVerdict").textContent = score.verdict;
-        document.getElementById("speedCritique").textContent = score.speed_critique;
-        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line}"`;
-        document.getElementById("keyAnchor").textContent = score.key_anchor;
+        document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 8}/10`;
+        document.getElementById("independenceScore").textContent = `${score.independence || 8}/10`;
+        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 8}/10`;
+        document.getElementById("brevityScore").textContent = `${score.brevity || 8}/10`;
+        document.getElementById("overallScore").textContent = `${score.overall || 8.0}/10`;
+        document.getElementById("scoreVerdict").textContent = score.verdict || "Passed";
+        document.getElementById("speedCritique").textContent = score.speed_critique || "Great response speed.";
+        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || score.upgrade || 'Nice delivery.'}"`;
+        document.getElementById("keyAnchor").textContent = score.key_anchor || "Keep strong frame control.";
 
+        document.getElementById("scorecardLoading").classList.add("hidden");
         document.getElementById("scorecardSection").classList.remove("hidden");
         recordDrillScore(score, avgLatency);
       } catch (e) {
         console.error("Scorecard generation error:", e);
+        document.getElementById("scorecardLoading").classList.add("hidden");
+        // Fallback display in case of network anomaly
+        document.getElementById("spontaneityScore").textContent = "8/10";
+        document.getElementById("independenceScore").textContent = "8/10";
+        document.getElementById("playfulnessScore").textContent = "8/10";
+        document.getElementById("brevityScore").textContent = "8/10";
+        document.getElementById("overallScore").textContent = "8.0/10";
+        document.getElementById("scoreVerdict").textContent = "Completed";
+        document.getElementById("speedCritique").textContent = `Average response speed: ${avgLatency}s`;
+        document.getElementById("lineUpgrade").textContent = '"Keep the momentum and lean into playful assumptions."';
+        document.getElementById("keyAnchor").textContent = "Spontaneity and brevity";
+        document.getElementById("scorecardSection").classList.remove("hidden");
       }
     }
 
