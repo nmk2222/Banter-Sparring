@@ -370,8 +370,8 @@
       loadHistoricalStats();
     }
 
-    // Complete Output Multi-Part Concatenation
-    async function executeModelCall(prompt, isJson = false, systemInstructionText = "") {
+    // Direct Gemini 3.6 Flash Dispatcher with Clean Payload
+    async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
         document.getElementById("apiKeySection").classList.remove("hidden");
@@ -385,17 +385,11 @@
       const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: 1000,
-          temperature: isJson ? 0.1 : 0.8,
+          maxOutputTokens: 600,
+          temperature: isJson ? 0.1 : 0.75,
           responseMimeType: isJson ? "application/json" : "text/plain"
         }
       };
-
-      if (systemInstructionText) {
-        payload.systemInstruction = {
-          parts: [{ text: systemInstructionText }]
-        };
-      }
 
       const resp = await fetch(url, {
         method: "POST",
@@ -414,12 +408,7 @@
 
       const candidate = data?.candidates?.[0];
       const parts = candidate?.content?.parts || [];
-      
-      // Concatenate all text parts excluding internal thought tokens
-      const fullText = parts
-        .filter(p => !p.thought)
-        .map(p => p.text || '')
-        .join('') || parts.map(p => p.text || '').join('');
+      const fullText = parts.map(p => p.text || '').join('');
 
       if (!fullText.trim()) {
         throw new Error("Empty response received.");
@@ -503,18 +492,22 @@
       const pool = SCENARIOS[currentTier];
       const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'You'}: ${t.text}`).join("\n");
       
-      const sysInstruction = `You are a real person engaging in natural, witty, casual conversation in real life.
+      const personaPrompt = `You are a real person engaging in natural, witty, casual conversation in real life.
 Location Setting: ${currentSetting}
 Behavioral Style: ${pool.instructions}
+
 RULES:
 1. Speak in 1-2 complete, authentic conversational sentences.
-2. Complete your thought fully—do not stop mid-sentence.
-3. Output ONLY your direct spoken line.`;
+2. Complete your thought fully.
+3. Output ONLY your direct spoken line.
 
-      const personaPrompt = `Conversation History:\n${dialogueStr}\n\nRespond to the last line from 'Me':`;
+Conversation History:
+${dialogueStr}
+
+Respond to the last line from 'Me':`;
 
       try {
-        const partnerReply = await executeModelCall(personaPrompt, false, sysInstruction);
+        const partnerReply = await executeModelCall(personaPrompt, false);
         appendMessage("assistant", partnerReply);
         transcriptLog.push({ role: "assistant", text: partnerReply });
         
@@ -545,34 +538,33 @@ RULES:
 
       const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
       
-      const criticPrompt = `
-      You are a world-class conversational charisma coach.
-      Analyze this banter transcript:
-      Setting: ${currentSetting}
-      Avg Reaction Latency: ${avgLatency}s
-      
-      Transcript:
-      ${transcriptStr}
+      const criticPrompt = `You are a world-class conversational charisma coach.
+Analyze this banter transcript:
+Setting: ${currentSetting}
+Avg Reaction Latency: ${avgLatency}s
 
-      Evaluate User based on:
-      1. Spontaneity (1-10): (<3.5s = 10, 3.5-6s = 8-9, 6-10s = 5-7, >10s = <5)
-      2. Outcome Independence (1-10)
-      3. Playfulness & Frame Control (1-10)
-      4. Brevity (1-10)
-      5. Warmth (1-10)
+Transcript:
+${transcriptStr}
 
-      Return ONLY valid JSON matching this schema:
-      {
-        "spontaneity": 9,
-        "independence": 8,
-        "playfulness": 7,
-        "brevity": 9,
-        "overall": 8.2,
-        "verdict": "Passed",
-        "speed_critique": "string",
-        "upgraded_line": "string",
-        "key_anchor": "string"
-      }`;
+Evaluate User based on:
+1. Spontaneity (1-10): (<3.5s = 10, 3.5-6s = 8-9, 6-10s = 5-7, >10s = <5)
+2. Outcome Independence (1-10)
+3. Playfulness & Frame Control (1-10)
+4. Brevity (1-10)
+5. Warmth (1-10)
+
+Return ONLY valid JSON matching this schema:
+{
+  "spontaneity": 9,
+  "independence": 8,
+  "playfulness": 7,
+  "brevity": 9,
+  "overall": 8.2,
+  "verdict": "Passed",
+  "speed_critique": "string",
+  "upgraded_line": "string",
+  "key_anchor": "string"
+}`;
 
       try {
         const rawJson = await executeModelCall(criticPrompt, true);
