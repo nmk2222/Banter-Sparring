@@ -17,22 +17,18 @@ if not api_key:
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-# Failover models to eliminate 503 errors completely
-MODEL_CASCADE = [
-    "gemini-3.6-flash",
-    "gemini-3.1-pro-preview",
-]
+PRIMARY_MODEL = "gemini-2.5-flash"
+BACKUP_MODEL = "gemini-3.6-flash"
 
 def fast_call(prompt, is_json=False):
-    """Ultra-fast call with automatic multi-model failover."""
-    last_err = None
-    for model_name in MODEL_CASCADE:
+    """Sub-second generation with immediate backup failover."""
+    cfg = types.GenerateContentConfig(
+        response_mime_type="application/json" if is_json else None,
+        max_output_tokens=50 if not is_json else 600,
+        temperature=0.7 if not is_json else 0.2
+    )
+    for model_name in [PRIMARY_MODEL, BACKUP_MODEL]:
         try:
-            cfg = types.GenerateContentConfig(
-                response_mime_type="application/json" if is_json else None,
-                max_output_tokens=60 if not is_json else 800,
-                temperature=0.7 if not is_json else 0.2
-            )
             resp = client.models.generate_content(
                 model=model_name,
                 contents=prompt,
@@ -40,12 +36,11 @@ def fast_call(prompt, is_json=False):
             )
             if resp and resp.text:
                 return resp.text.strip()
-        except Exception as e:
-            last_err = e
+        except Exception:
             continue
-    raise last_err
+    raise Exception("Model servers temporarily busy. Please tap Send once more.")
 
-# Scenarios Library
+# 20 Distinct Settings per Training Level
 SCENARIO_POOLS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
         "instructions": "Keep replies strictly under 1-2 punchy sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
@@ -62,7 +57,14 @@ SCENARIO_POOLS = {
             "You are standing in line at a food truck festival trying to decide between two complicated fusion taco menus.",
             "You are browsing plants and succulents in the greenhouse section of a garden nursery.",
             "You are waiting in the pickup line at a busy downtown juice and smoothie bar.",
-            "You are standing on a sunny train platform waiting for the morning commuter express train."
+            "You are standing on a sunny train platform waiting for the morning commuter express train.",
+            "You are waiting at the counter of a boutique gelato shop sampling different exotic flavors.",
+            "You are browsing high-end kitchenware and espresso machines in a home goods store.",
+            "You are standing in line at a gourmet donut shop admiring an overly elaborate pastry display.",
+            "You are waiting for a takeaway matcha latte while sheltering under an awning from sudden rain.",
+            "You are looking at local honey and hot sauce bottles at an outdoor community harvest fair.",
+            "You are waiting near the customer service desk at an upscale department store.",
+            "You are sitting in the courtyard of an open-air shopping village holding shopping bags."
         ]
     },
     "Level 2: The Gallery Mixer (Neutral Ground)": {
@@ -80,7 +82,14 @@ SCENARIO_POOLS = {
             "You are waiting for a photography exhibit lecture to begin in a museum auditorium lobby.",
             "You are sampling micro-batch cheeses at a gourmet food and wine expo.",
             "You are browsing rare vintage books at an antiquarian book fair.",
-            "You are checking out handcrafted ceramics at a local studio open house."
+            "You are checking out handcrafted ceramics at a local studio open house.",
+            "You are holding a program while waiting for an independent architecture film screening to start.",
+            "You are standing by a classic vintage sports car at a charity concourse auto show.",
+            "You are browsing original graphic prints at a contemporary local artist market.",
+            "You are waiting in the foyer of a restored art deco theater before an acoustic performance.",
+            "You are sampling dark single-origin chocolate bars at an artisan confectioner showcase.",
+            "You are examining restored mid-century lighting fixtures in a design studio showroom.",
+            "You are mingling on the outdoor sculpture terrace of a museum overlooking the water."
         ]
     },
     "Level 3: The Dinner Party / Mutual Friends (Warm Social Dynamics)": {
@@ -98,7 +107,14 @@ SCENARIO_POOLS = {
             "You are sitting around a fondue pot at a winter cabin ski weekend dinner.",
             "You are hanging out by the grill with a drink while the host attempts to smoke a brisket.",
             "You are tasting blindfolded wines at a casual friend group wine-tasting party.",
-            "You are sitting at a rooftop communal dinner table watching the city skyline as dinner winds down."
+            "You are sitting at a rooftop communal dinner table watching the city skyline as dinner winds down.",
+            "You are cracking open crab legs at an informal outdoor summer seafood boil.",
+            "You are sitting by the pool patio helping assemble gourmet burgers at an afternoon cookout.",
+            "You are sharing a charcuterie board on the porch of a country farmhouse weekend retreat.",
+            "You are passing dessert platters around a candlelit garden patio dinner.",
+            "You are gathered around an outdoor pizza oven waiting for custom wood-fired pies.",
+            "You are sitting on a cozy living room sectional during an informal post-dinner game night.",
+            "You are helping uncork magnum bottles at an anniversary celebration dinner."
         ]
     },
     "Level 4: The Music Festival / Concert (High Energy, Fast Calibration)": {
@@ -116,7 +132,14 @@ SCENARIO_POOLS = {
             "You are hanging out in the mezzanine lounge of a concert venue holding two overpriced craft beers.",
             "You are sitting on the grass hill at an afternoon bluegrass festival listening to the opening act.",
             "You are standing in the lobby of an acoustic concert hall at intermission discussing the performance.",
-            "You are watching the DJ set up gear from the edge of the dance floor at a rooftop sunset party."
+            "You are watching the DJ set up gear from the edge of the dance floor at a rooftop sunset party.",
+            "You are standing near the encore barrier waiting for the band to come back out for one last song.",
+            "You are walking through the illuminated festival art installations between late-night stage sets.",
+            "You are standing by the sound tent sheltering under an umbrella during a festival rain delay.",
+            "You are leaning on the wooden railing of an outdoor pier concert watching the sun go down.",
+            "You are waiting by the artist stage door after a small club show holding a ticket stub.",
+            "You are resting on the turf at an all-day funk and soul festival listening to a brass band.",
+            "You are waiting in the coat check queue at 1 AM after a high-energy dance show."
         ]
     },
     "Level 5: The Fitness Class / Gym (Low Friction, Non-Intrusive)": {
@@ -134,7 +157,14 @@ SCENARIO_POOLS = {
             "You are waiting for the cold plunge tub to open up after a heavy leg workout.",
             "You are tightening your lifting belt near the squat rack while switching weight plates.",
             "You are untying your running shoes on a locker room bench after an outdoor track workout.",
-            "You are mixing a protein shaker bottle at the smoothie counter of a boutique climbing gym."
+            "You are mixing a protein shaker bottle at the smoothie counter of a boutique climbing gym.",
+            "You are adjusting resistance bands on a Pilates reformer machine before class starts.",
+            "You are resting your arms on a heavy punching bag after a boxing conditioning round.",
+            "You are catching your breath on the turf after a grueling series of kettlebell swings.",
+            "You are adjusting your swim goggles at the edge of a 25-meter lap pool before swim drills.",
+            "You are putting away weighted vests after an uphill incline treadmill session.",
+            "You are sitting on a balance ball cooling down after a high-intensity interval session.",
+            "You are wiping sweat off your brow near the pull-up bars at an outdoor beach workout park."
         ]
     },
     "Level 6: The Lounge (Flirtatious & High Polarity)": {
@@ -152,7 +182,14 @@ SCENARIO_POOLS = {
             "You are sharing bar space while waiting for a glass of natural wine at a lively neighborhood enoteca.",
             "You are leaning against a marble cocktail counter watching a mixologist carve clear ice blocks.",
             "You are sitting in the courtyard lounge of a boutique hotel with a late-night cocktail.",
-            "You are standing by the DJ booth at an upscale after-work lounge listening to deep house music."
+            "You are standing by the DJ booth at an upscale after-work lounge listening to deep house music.",
+            "You are sitting at the dark polished mahogany bar of a classic historic jazz lounge.",
+            "You are waiting for a handcrafted mezcal cocktail at a lively subterranean basement bar.",
+            "You are leaning on a high-top table on the heated terrace of a waterfront bistro.",
+            "You are looking at rare Japanese whiskies behind the glass of an intimate listening bar.",
+            "You are sitting on a velvet barstool waiting for a signature martini at a vintage steakhouse bar.",
+            "You are sharing a communal high-top bench at a trendy craft cider and beer garden.",
+            "You are enjoying an aperitivo spritz at a stylish open-air Italian plaza lounge."
         ]
     },
     "Level 7: The Skeptical Stranger (Frame Control)": {
@@ -170,7 +207,14 @@ SCENARIO_POOLS = {
             "You are sitting on a park bench working on a tablet, looking focused and slightly guarded.",
             "You are waiting for takeout food at a crowded restaurant counter where orders are running late.",
             "You are standing near the coat check line at a large conference hall at the end of a long seminar day.",
-            "You are waiting for an elevator in a silent medical office building hallway."
+            "You are waiting for an elevator in a silent medical office building hallway.",
+            "You are standing in a slow line at the dry cleaners holding an armful of suits.",
+            "You are sitting in the tire center waiting lounge staring at a muted television screen.",
+            "You are waiting for a delayed rideshare on a rainy downtown street corner under an umbrella.",
+            "You are standing in the basement parking garage payment booth line holding a parking ticket.",
+            "You are waiting in the customer service return queue at an electronics superstore on a busy Saturday.",
+            "You are sitting in the hallway outside a courthouse waiting room reviewing documents.",
+            "You are waiting for your takeaway order in the entryway of a crowded noodle shop during a blizzard."
         ]
     }
 }
@@ -191,11 +235,11 @@ if "evaluation" not in st.session_state:
 
 pairs_count = len(st.session_state.transcript) // 2
 
-# Header Layout
+# Top Header Layout
 top_col1, top_col2 = st.columns([3, 1])
 with top_col1:
     st.title("⚡ Charisma & Banter Lab")
-    st.caption("Sub-second conversational sparring with precision latency tracking.")
+    st.caption("Sub-second conversational sparring with precision stopwatch scoring.")
 with top_col2:
     st.write("")
     if st.button("🔄 Reset Scenario", use_container_width=True):
