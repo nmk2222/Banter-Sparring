@@ -17,13 +17,30 @@ if not api_key:
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-# Active Production Model
 ACTIVE_MODEL = "gemini-3.6-flash"
 
-def stream_response_with_retry(prompt):
-    """Streams dialogue chunks with automatic retry on transient capacity spikes."""
+def robust_generate_call(contents, is_json=False):
+    """Executes model calls with automatic backoff retry to handle 503 capacity spikes."""
+    config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
     last_err = None
-    for attempt in range(3):
+    for attempt in range(4):
+        try:
+            resp = client.models.generate_content(
+                model=ACTIVE_MODEL,
+                contents=contents,
+                config=config
+            )
+            if resp and resp.text:
+                return resp.text.strip()
+        except Exception as e:
+            last_err = e
+            time.sleep(1.2 * (attempt + 1))
+    raise last_err
+
+def robust_stream_call(prompt):
+    """Streams dialogue chunks with backoff retry on transient 503 errors."""
+    last_err = None
+    for attempt in range(4):
         try:
             stream = client.models.generate_content_stream(
                 model=ACTIVE_MODEL,
@@ -35,24 +52,7 @@ def stream_response_with_retry(prompt):
             return
         except Exception as e:
             last_err = e
-            time.sleep(1.0)
-    raise last_err
-
-def evaluate_with_retry(prompt):
-    """Generates structured JSON evaluation with automatic retry."""
-    last_err = None
-    for attempt in range(3):
-        try:
-            resp = client.models.generate_content(
-                model=ACTIVE_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            if resp and resp.text:
-                return resp.text.strip()
-        except Exception as e:
-            last_err = e
-            time.sleep(1.0)
+            time.sleep(1.2 * (attempt + 1))
     raise last_err
 
 # Scenarios Library
@@ -194,8 +194,8 @@ if "transcript" not in st.session_state:
     st.session_state.transcript = []
 if "reaction_times" not in st.session_state:
     st.session_state.reaction_times = []
-if "turn_start_time" not in st.session_state:
-    st.session_state.turn_start_time = time.time()
+if "stopwatch_anchor" not in st.session_state:
+    st.session_state.stopwatch_anchor = time.time()
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
 
@@ -205,7 +205,7 @@ pairs_count = len(st.session_state.transcript) // 2
 top_col1, top_col2 = st.columns([3, 1])
 with top_col1:
     st.title("⚡ Charisma & Banter Lab")
-    st.caption("Low-latency conversational sparring with timing analysis.")
+    st.caption("Low-latency conversational sparring with stopwatch precision.")
 with top_col2:
     st.write("")
     if st.button("🔄 Reset Scenario", use_container_width=True):
@@ -213,10 +213,10 @@ with top_col2:
         st.session_state.reaction_times = []
         st.session_state.evaluation = None
         st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
-        st.session_state.turn_start_time = time.time()
+        st.session_state.stopwatch_anchor = time.time()
         st.rerun()
 
-# Level Selection
+# Scenario Selection
 selected_level = st.selectbox("Select Training Scenario Tier:", list(SCENARIO_POOLS.keys()))
 if selected_level != st.session_state.level:
     st.session_state.level = selected_level
@@ -224,7 +224,7 @@ if selected_level != st.session_state.level:
     st.session_state.transcript = []
     st.session_state.reaction_times = []
     st.session_state.evaluation = None
-    st.session_state.turn_start_time = time.time()
+    st.session_state.stopwatch_anchor = time.time()
     st.rerun()
 
 st.info(f"📍 **Setting:** {st.session_state.current_setting}")
@@ -258,33 +258,31 @@ if pairs_count < 4:
             send_btn = st.form_submit_button("Send Line ⚡", use_container_width=True)
 
     user_line = None
+    measured_latency = None
 
-    if audio_record and "bytes" in audio_record and audio_record["bytes"]:
-        with st.spinner("⚡ Transcribing..."):
-            try:
-                transcribe_resp = client.models.generate_content(
-                    model=ACTIVE_MODEL,
-                    contents=[
-                        types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
-                        "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
-                    ]
-                )
-                user_line = transcribe_resp.text.strip()
-            except Exception as e:
-                st.error(f"Audio Transcription Error: {str(e)}")
-    elif send_btn and typed_message:
+    if send_btn and typed_message:
+        measured_latency = max(0.5, round(time.time() - st.session_state.stopwatch_anchor, 1))
         user_line = typed_message.strip()
+    elif audio_record and "bytes" in audio_record and audio_record["bytes"]:
+        measured_latency = max(0.5, round(time.time() - st.session_state.stopwatch_anchor, 1))
+        with st.spinner("⚡ Transcribing audio..."):
+            try:
+                user_line = robust_generate_call([
+                    types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
+                    "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
+                ])
+            except Exception as e:
+                st.error(f"Transcription Error (Server Busy): {str(e)}")
 
     # Streaming Generation
     if user_line:
-        time_taken = max(0.8, round(time.time() - st.session_state.turn_start_time, 1))
-        st.session_state.reaction_times.append(time_taken)
+        st.session_state.reaction_times.append(measured_latency)
         
-        # Display User Line
-        st.chat_message("user").write(f"{user_line} *(⚡ {time_taken}s)*")
+        # Display user line immediately
+        st.chat_message("user").write(f"{user_line} *(⚡ {measured_latency}s)*")
         
         temp_history = list(st.session_state.transcript)
-        temp_history.append({"role": "user", "text": user_line, "latency": time_taken})
+        temp_history.append({"role": "user", "text": user_line, "latency": measured_latency})
         
         dialogue_str = "\n".join([f"{t['role'].upper()}: {t['text']}" for t in temp_history])
         persona_prompt = f"""
@@ -301,23 +299,23 @@ if pairs_count < 4:
             response_container = st.empty()
             full_reply = ""
             try:
-                for chunk in stream_response_with_retry(persona_prompt):
+                for chunk in robust_stream_call(persona_prompt):
                     full_reply += chunk
                     response_container.write(full_reply + "▌")
                 response_container.write(full_reply)
                 
-                st.session_state.transcript.append({"role": "user", "text": user_line, "latency": time_taken})
+                st.session_state.transcript.append({"role": "user", "text": user_line, "latency": measured_latency})
                 st.session_state.transcript.append({"role": "assistant", "text": full_reply})
-                st.session_state.turn_start_time = time.time()
+                st.session_state.stopwatch_anchor = time.time()  # Reset stopwatch for next user turn
                 st.rerun()
             except Exception as e:
-                st.error(f"Stream Error: {str(e)}")
+                st.error(f"Partner Response Error (Server Busy): {str(e)}")
 
 else:
     # Round Complete - Evaluation Section
     valid_times = [t for t in st.session_state.reaction_times if t > 0]
     avg_latency = round(sum(valid_times) / len(valid_times), 1) if valid_times else 3.5
-    st.success(f"🎉 Drill Complete! (Average Reaction Latency: {avg_latency}s)")
+    st.success(f"🎉 Drill Complete! (Average User Reaction Time: {avg_latency}s)")
     
     if st.session_state.evaluation is None:
         if st.button("📊 Generate Charisma & Speed Scorecard", use_container_width=True):
@@ -366,8 +364,7 @@ else:
                 }}
                 """
                 try:
-                    eval_raw = evaluate_with_retry(critic_prompt)
-                    # Clean any markdown codefence wrapping if present
+                    eval_raw = robust_generate_call(critic_prompt, is_json=True)
                     clean_json = eval_raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
                     st.session_state.evaluation = json.loads(clean_json)
                     st.rerun()
@@ -407,5 +404,5 @@ else:
             st.session_state.reaction_times = []
             st.session_state.evaluation = None
             st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
-            st.session_state.turn_start_time = time.time()
+            st.session_state.stopwatch_anchor = time.time()
             st.rerun()
