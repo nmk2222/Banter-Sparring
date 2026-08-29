@@ -21,7 +21,7 @@ PRIMARY_MODEL = "gemini-2.5-flash"
 BACKUP_MODEL = "gemini-3.6-flash"
 
 def fast_call(prompt, is_json=False):
-    """Sub-second generation with immediate backup failover."""
+    """Sub-second text generation with immediate backup failover."""
     cfg = types.GenerateContentConfig(
         response_mime_type="application/json" if is_json else None,
         max_output_tokens=50 if not is_json else 600,
@@ -39,6 +39,25 @@ def fast_call(prompt, is_json=False):
         except Exception:
             continue
     raise Exception("Model servers temporarily busy. Please tap Send once more.")
+
+def transcribe_audio_bytes(audio_bytes):
+    """Robust audio transcription with dedicated multimodal handling and retries."""
+    for model_name in [PRIMARY_MODEL, BACKUP_MODEL]:
+        for attempt in range(2):
+            try:
+                resp = client.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        types.Part.from_bytes(data=audio_bytes, mime_type="audio/webm"),
+                        "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
+                    ]
+                )
+                if resp and resp.text:
+                    return resp.text.strip()
+            except Exception:
+                time.sleep(0.8)
+                continue
+    raise Exception("Could not process audio line. Please try speaking again or use the text box.")
 
 # 20 Distinct Settings per Training Level
 SCENARIO_POOLS = {
@@ -235,11 +254,11 @@ if "evaluation" not in st.session_state:
 
 pairs_count = len(st.session_state.transcript) // 2
 
-# Top Header Layout
+# Header Layout
 top_col1, top_col2 = st.columns([3, 1])
 with top_col1:
     st.title("⚡ Charisma & Banter Lab")
-    st.caption("Sub-second conversational sparring with precision stopwatch scoring.")
+    st.caption("Sub-second conversational sparring with precision latency tracking.")
 with top_col2:
     st.write("")
     if st.button("🔄 Reset Scenario", use_container_width=True):
@@ -305,12 +324,9 @@ if pairs_count < 4:
         now = time.time()
         if pairs_count > 0 and st.session_state.active_timer_start is not None:
             calculated_latency = max(0.5, round(now - st.session_state.active_timer_start, 1))
-        with st.spinner("⚡ Transcribing..."):
+        with st.spinner("⚡ Transcribing audio..."):
             try:
-                user_line = fast_call([
-                    types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
-                    "Transcribe spoken English accurately. Output ONLY transcription text."
-                ])
+                user_line = transcribe_audio_bytes(audio_record["bytes"])
             except Exception as e:
                 st.error(f"Transcription Error: {str(e)}")
 
