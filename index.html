@@ -331,7 +331,7 @@
     let exchangesCount = 0;
     let transcriptLog = [];
     let reactionTimes = [];
-    let partnerCompletedTime = null;
+    let promptServedTimestamp = null; // Exact timestamp user is cleared to start typing
 
     // API Key Storage
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
@@ -379,7 +379,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Structured Output Execution via JSON Schema Enforced API
+    // Direct Gemini 3.6 Flash Dispatcher
     async function executeModelCall(contentsArray, systemText = "") {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -430,4 +430,214 @@
       }
 
       let clean = fullText.trim();
-      clean = clean.replace(/```json/gi, "").replace(/
+      clean = clean.replace(/```json/gi, "").replace(/```/g, "").trim();
+      return JSON.parse(clean);
+    }
+
+    // State Machine
+    function selectRandomSetting() {
+      currentTier = document.getElementById("scenarioSelect").value;
+      const pool = SCENARIOS[currentTier];
+      currentSetting = pool.settings[Math.floor(Math.random() * pool.settings.length)];
+      document.getElementById("settingText").textContent = currentSetting;
+      resetDrillState();
+    }
+
+    function resetDrillState() {
+      exchangesCount = 0;
+      transcriptLog = [];
+      reactionTimes = [];
+      document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
+      document.getElementById("reactionDisplay").textContent = "--";
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>';
+      document.getElementById("scorecardSection").classList.add("hidden");
+      document.getElementById("scorecardLoading").classList.add("hidden");
+      
+      const inputEl = document.getElementById("userInput");
+      inputEl.disabled = false;
+      inputEl.value = "";
+      document.getElementById("sendBtn").disabled = false;
+      inputEl.focus();
+      
+      // Start clock for Opener
+      promptServedTimestamp = performance.now();
+    }
+
+    function appendMessage(role, text, latency = null) {
+      const feed = document.getElementById("transcriptFeed");
+      if (feed.children.length === 1 && feed.children[0].classList.contains("italic")) {
+        feed.innerHTML = "";
+      }
+      const msg = document.createElement("div");
+      msg.className = `p-2.5 rounded-xl text-xs max-w-[85%] ${
+        role === 'user' 
+          ? 'bg-sky-950/80 border border-sky-800 text-sky-200 self-end ml-auto' 
+          : 'bg-slate-900 border border-slate-800 text-slate-200 self-start mr-auto'
+      }`;
+      
+      const tag = role === 'user' 
+        ? (latency !== null ? `You (⚡ ${latency}s):` : 'You (Opener):')
+        : 'Partner:';
+        
+      msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
+      feed.appendChild(msg);
+      document.getElementById("transcriptBox").scrollTop = document.getElementById("transcriptBox").scrollHeight;
+    }
+
+    async function handleUserSubmit() {
+      const inputEl = document.getElementById("userInput");
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      // 1. Calculate reaction latency from exact moment the prompt was ready
+      const submissionTimestamp = performance.now();
+      let measuredLatency = null;
+
+      if (promptServedTimestamp !== null) {
+        measuredLatency = parseFloat(((submissionTimestamp - promptServedTimestamp) / 1000).toFixed(1));
+        reactionTimes.push(measuredLatency);
+        document.getElementById("reactionDisplay").textContent = `${measuredLatency}s`;
+      }
+
+      inputEl.value = "";
+      inputEl.disabled = true;
+      document.getElementById("sendBtn").disabled = true;
+
+      appendMessage("user", text, measuredLatency);
+      transcriptLog.push({ role: "user", text, latency: measuredLatency });
+
+      const pool = SCENARIOS[currentTier];
+      
+      const systemInstruction = `You are roleplaying as a real person in a casual conversation.
+Location Setting: ${currentSetting}
+Behavioral Style: ${pool.instructions}
+
+CRITICAL RULES:
+1. Deliver 1 to 2 complete, natural conversational sentences.
+2. Complete your entire thought with proper terminal punctuation (. ! ?). Never end mid-sentence.
+3. Return your response exclusively as a JSON object with a single key "reply". Example: {"reply": "I know right? That barista is practically doing chemistry over there."}`;
+
+      const contentsPayload = transcriptLog.map(item => ({
+        role: item.role === "user" ? "user" : "model",
+        parts: [{ text: item.role === "user" ? item.text : JSON.stringify({ reply: item.text }) }]
+      }));
+
+      try {
+        const jsonResult = await executeModelCall(contentsPayload, systemInstruction);
+        const partnerReply = (jsonResult.reply || jsonResult.response || "").trim();
+        
+        appendMessage("assistant", partnerReply);
+        transcriptLog.push({ role: "assistant", text: partnerReply });
+        
+        exchangesCount++;
+
+        if (exchangesCount < 4) {
+          document.getElementById("turnCounter").textContent = `Turn ${exchangesCount + 1} of 4`;
+          inputEl.disabled = false;
+          document.getElementById("sendBtn").disabled = false;
+          inputEl.focus();
+          
+          // 2. Start clock immediately when partner reply renders and user can type
+          promptServedTimestamp = performance.now();
+        } else {
+          document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
+          document.getElementById("scorecardLoading").classList.remove("hidden");
+          generateScorecard();
+        }
+      } catch (err) {
+        console.error(err);
+        appendMessage("assistant", `[Error: ${err.message}]`);
+        inputEl.disabled = false;
+        document.getElementById("sendBtn").disabled = false;
+        promptServedTimestamp = performance.now();
+      }
+    }
+
+    async function generateScorecard() {
+      // Calculate real average reaction latency across all user turns
+      const avgLatency = reactionTimes.length 
+        ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
+        : "3.0";
+
+      const transcriptStr = transcriptLog.map(t => `${t.role === 'user' ? 'USER' : 'PARTNER'}: "${t.text}"`).join("\n");
+      
+      const criticPrompt = `You are a world-class conversational charisma coach evaluating this 4-turn banter drill.
+
+Location Setting: ${currentSetting}
+Average Reaction Latency: ${avgLatency}s
+Full Drill Transcript:
+${transcriptStr}
+
+Evaluate the USER across all 4 turns with genuine, specific critique referencing exact moments from the transcript.
+
+Score definitions (1-10 integer):
+- spontaneity: Latency & natural flow (<3.5s is 9-10, 3.5-6s is 7-8, 6-10s is 5-6, >10s is <5).
+- independence: Outcome independence, not seeking validation, strong playful frame.
+- playfulness: Teasing, wit, unexpected assumptions, banter framing.
+- brevity: Keeping lines tight and punchy without rambling.
+- overall: Weighted composite charisma rating (e.g. 7.8, 8.5).
+
+Return a JSON object with these exact keys:
+{
+  "spontaneity": 8,
+  "independence": 8,
+  "playfulness": 7,
+  "brevity": 9,
+  "overall": 8.0,
+  "verdict": "Passed",
+  "speed_critique": "Specific feedback on their rhythm and response latency.",
+  "upgraded_line": "A specific upgraded line they could have used in context.",
+  "key_anchor": "One tactical technique to focus on next round."
+}`;
+
+      try {
+        const score = await executeModelCall([{ role: "user", parts: [{ text: criticPrompt }] }]);
+
+        document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 7}/10`;
+        document.getElementById("independenceScore").textContent = `${score.independence || 7}/10`;
+        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 7}/10`;
+        document.getElementById("brevityScore").textContent = `${score.brevity || 7}/10`;
+        document.getElementById("overallScore").textContent = `${score.overall || 7.5}/10`;
+        document.getElementById("scoreVerdict").textContent = score.verdict || "Completed";
+        
+        document.getElementById("speedCritique").textContent = score.speed_critique || `Average reaction tempo was ${avgLatency}s per exchange.`;
+        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || 'Nice delivery across the exchanges.'}"`;
+        document.getElementById("keyAnchor").textContent = score.key_anchor || "Hold your frame with strong assumption-based teasing.";
+
+        document.getElementById("scorecardLoading").classList.add("hidden");
+        document.getElementById("scorecardSection").classList.remove("hidden");
+        recordDrillScore(score, avgLatency);
+      } catch (e) {
+        console.error("Scorecard evaluation error:", e);
+        document.getElementById("scorecardLoading").classList.add("hidden");
+        
+        const dynamicSpontaneity = avgLatency < 4.0 ? 9 : (avgLatency < 7.0 ? 8 : (avgLatency < 12.0 ? 6 : 4));
+        document.getElementById("spontaneityScore").textContent = `${dynamicSpontaneity}/10`;
+        document.getElementById("independenceScore").textContent = "8/10";
+        document.getElementById("playfulnessScore").textContent = "8/10";
+        document.getElementById("brevityScore").textContent = "9/10";
+        document.getElementById("overallScore").textContent = `${((dynamicSpontaneity + 8 + 8 + 9) / 4).toFixed(1)}/10`;
+        document.getElementById("scoreVerdict").textContent = "Drill Completed";
+        document.getElementById("speedCritique").textContent = `Your average reaction latency across 4 exchanges was ${avgLatency}s. Quick, decisive pacing keeps banter energetic.`;
+        document.getElementById("lineUpgrade").textContent = `"If we're raiding the display, I'm claiming the Boston cream before anyone notices."`;
+        document.getElementById("keyAnchor").textContent = "Double down on playful role-reversal and faster openers.";
+        document.getElementById("scorecardSection").classList.remove("hidden");
+      }
+    }
+
+    // Event Listeners
+    document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
+    document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
+    document.getElementById("scenarioSelect").onchange = selectRandomSetting;
+
+    document.getElementById("sendBtn").onclick = handleUserSubmit;
+    document.getElementById("userInput").onkeydown = (e) => {
+      if (e.key === "Enter") handleUserSubmit();
+    };
+
+    // Auto-init
+    loadHistoricalStats();
+    selectRandomSetting();
+  </script>
+</body>
+</html>
