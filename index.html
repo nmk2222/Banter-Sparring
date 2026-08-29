@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Charisma & Banter Lab</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -13,33 +11,31 @@
   
   <div class="max-w-2xl w-full flex flex-col gap-4">
     
-    <!-- Top Header -->
+    <!-- Top Bar -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <div>
-        <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
-          ⚡ Charisma & Banter Lab
-        </h1>
+        <h1 class="text-2xl font-bold text-sky-400">⚡ Charisma & Banter Lab</h1>
         <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Sub-second Latency Tracking</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-        <span id="keyStatusText">⚙️ Key Active</span>
+        <span id="keyStatusText">⚙️ Configure API Key</span>
       </button>
     </div>
 
     <!-- API Key Drawer -->
     <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all">
       <div class="flex items-center justify-between">
-        <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
+        <label class="text-xs font-semibold text-slate-300">Gemini API Key (AQ. or AIza):</label>
         <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved</span>
       </div>
       <div class="flex gap-2">
-        <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
+        <input type="password" id="apiKeyInput" placeholder="Paste your API key..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
         <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
       </div>
     </div>
 
-    <!-- Lifetime Stats History -->
+    <!-- Stats History -->
     <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs">
       <div>
         <div class="text-[10px] text-slate-500 uppercase tracking-wider">Drills Done</div>
@@ -59,7 +55,7 @@
       </div>
     </div>
 
-    <!-- Tier & Scenario Selection -->
+    <!-- Tier Selection -->
     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <label class="text-xs font-semibold text-slate-300">Select Difficulty Tier:</label>
@@ -117,7 +113,6 @@
         <span id="scoreVerdict" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Passed</span>
       </div>
 
-      <!-- Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -141,7 +136,6 @@
         </div>
       </div>
 
-      <!-- Coaching Analysis -->
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
@@ -164,7 +158,7 @@
 
   <script>
     const SCENARIOS = {
-      level1: { instructions: "Respond in 1 punchy, natural, grounded sentence (max 15 words). Match casual low-stakes banter.", settings: [
+      level1: { instructions: "Respond in 1 punchy, grounded sentence (max 15 words). Match casual low-stakes banter.", settings: [
         "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every single order.",
         "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
         "Standing in a long line at a popular Sunday morning bagel bakery watching the chaotic kitchen staff.",
@@ -186,7 +180,7 @@
         "Waiting near the customer service desk at an upscale department store.",
         "Sitting in the courtyard of an open-air shopping village holding shopping bags."
       ]},
-      level2: { instructions: "Respond in 1-2 punchy sentences. Challenge clichés, reward funny assumptions, maintain playful social flow.", settings: [
+      level2: { instructions: "Respond in 1-2 punchy sentences. Challenge clichés, reward funny assumptions.", settings: [
         "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a sparkling water.",
         "Browsing rare vintage vinyl records at a local weekend pop-up fair.",
         "Browsing items at a silent charity auction while sipping champagne.",
@@ -373,7 +367,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Gemini 3.6 Flash Invocation (Exact Supported Endpoint)
+    // Direct Header-Based API Invocation (Strictly via x-goog-api-key for AQ. keys)
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -383,7 +377,7 @@
       }
       const apiKey = rawKey.trim();
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
       const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -395,7 +389,10 @@
 
       const resp = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
         body: JSON.stringify(payload)
       });
 
@@ -498,7 +495,7 @@ ${dialogueStr}
 
 Instructions:
 Reply naturally to the last line from 'Me'. Speak in 1-2 realistic, witty conversational sentences. 
-Do not prefix your response with "Partner:" or "You:". Output only the direct dialogue words without surrounding quotes.
+Do not prefix your response with "Partner:" or "You:". Output only the direct dialogue words.
 `;
 
       try {
