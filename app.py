@@ -15,7 +15,7 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 
-# Expanded Scenario Prompts
+# All Scenarios Dictionary
 SCENARIOS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
         "context": "You are a warm, slightly witty stranger standing in line at a busy boutique coffee shop.",
@@ -56,6 +56,14 @@ if "turn_count" not in st.session_state:
     st.session_state.turn_count = 0
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
+
+st.title("🎙️ Charisma & Banter Lab")
+st.caption("Audio-first dynamic conversational sparring with instant charisma scoring.")
+
+selected_level = st.selectbox("Select Training Scenario:", list(SCENARIOS.keys()))
+if selected_level != st.session_state.level:
+    st.session_state.level = selected_level
+    st.session_state.transcript = []
     st.session_state.turn_count = 0
     st.session_state.evaluation = None
     st.rerun()
@@ -69,7 +77,7 @@ for turn in st.session_state.transcript:
     else:
         with st.chat_message("assistant"):
             st.write(turn["text"])
-            if "audio" in turn:
+            if "audio" in turn and turn["audio"]:
                 st.audio(turn["audio"], format="audio/mp3")
 
 # Turn Handling (Max 4 turns per drill)
@@ -91,7 +99,6 @@ if st.session_state.turn_count < 4:
     user_text = ""
     if audio_record and "bytes" in audio_record:
         with st.spinner("Listening..."):
-            # Transcribe audio using Gemini Flash
             transcribe_resp = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
@@ -126,19 +133,21 @@ if st.session_state.turn_count < 4:
             partner_reply = response.text.strip()
 
             # Text to Speech using Gemini Audio output
-            tts_resp = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=f"Read this line aloud naturally with subtle vocal expression: {partner_reply}",
-                config=types.GenerateContentConfig(
-                    response_mime_type="audio/mp3"
-                )
-            )
-            
             audio_bytes = None
-            if tts_resp.candidates and tts_resp.candidates[0].content.parts:
-                for part in tts_resp.candidates[0].content.parts:
-                    if hasattr(part, 'inline_data') and part.inline_data:
-                        audio_bytes = part.inline_data.data
+            try:
+                tts_resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=f"Read this line aloud naturally with subtle vocal expression: {partner_reply}",
+                    config=types.GenerateContentConfig(
+                        response_mime_type="audio/mp3"
+                    )
+                )
+                if tts_resp.candidates and tts_resp.candidates[0].content.parts:
+                    for part in tts_resp.candidates[0].content.parts:
+                        if hasattr(part, 'inline_data') and part.inline_data:
+                            audio_bytes = part.inline_data.data
+            except Exception:
+                audio_bytes = None
 
             turn_data = {"role": "assistant", "text": partner_reply}
             if audio_bytes:
