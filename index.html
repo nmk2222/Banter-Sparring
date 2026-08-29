@@ -3,41 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Charisma & Banter Lab | Rapid Text Sparring</title>
+  <title>Charisma & Banter Lab</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
   
   <div class="max-w-2xl w-full flex flex-col gap-4">
     
-    <!-- Top Header -->
+    <!-- Top Bar -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">High-speed keyboard banter sparring & persistent analytics</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Sub-second Latency Tracking</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
-        <span id="keyStatusText">🔑 Configure Key</span>
+        <span id="keyStatusText">⚙️ Configure API Key</span>
       </button>
     </div>
 
-    <!-- Hidden API Key Drawer -->
-    <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all hidden">
+    <!-- Collapsible API Key Drawer -->
+    <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all">
       <div class="flex items-center justify-between">
-        <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved</span>
+        <label class="text-xs font-semibold text-slate-300">Google AI Studio API Key:</label>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Active and saved</span>
       </div>
       <div class="flex gap-2">
-        <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
-        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save</button>
+        <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
+        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
       </div>
     </div>
 
-    <!-- Historical Performance Summary -->
-    <div id="historyStatsBar" class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs">
+    <!-- Lifetime Stats History -->
+    <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs">
       <div>
         <div class="text-[10px] text-slate-500 uppercase tracking-wider">Drills Done</div>
         <div id="statDrills" class="font-bold text-sky-400 text-sm mt-0.5">0</div>
@@ -56,45 +56,45 @@
       </div>
     </div>
 
-    <!-- Scenario Selector & Setting -->
+    <!-- Scenario Selector & Setting Display -->
     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <label class="text-xs font-semibold text-slate-300">Scenario Tier:</label>
+        <label class="text-xs font-semibold text-slate-300">Select Difficulty Tier:</label>
         <select id="scenarioSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
-          <option value="level1">Level 1: The Casual Line Opener (Low Stakes)</option>
-          <option value="level2">Level 2: The Gallery Mixer (Neutral Ground)</option>
-          <option value="level3">Level 3: The Dinner Party / Mutual Friends (Social Flow)</option>
-          <option value="level4">Level 4: The Music Festival / Concert (High Energy)</option>
-          <option value="level5">Level 5: The Fitness Class / Gym (Low Friction)</option>
-          <option value="level6">Level 6: The Lounge (Flirtatious & Polarity)</option>
-          <option value="level7">Level 7: The Skeptical Stranger (Frame Control)</option>
+          <option value="level1">Level 1: The Casual Line Opener (20 Scenarios)</option>
+          <option value="level2">Level 2: The Gallery Mixer (20 Scenarios)</option>
+          <option value="level3">Level 3: The Dinner Party / Mutual Friends (20 Scenarios)</option>
+          <option value="level4">Level 4: The Music Festival / Concert (20 Scenarios)</option>
+          <option value="level5">Level 5: The Fitness Class / Gym (20 Scenarios)</option>
+          <option value="level6">Level 6: The Lounge / Social Bar (20 Scenarios)</option>
+          <option value="level7">Level 7: The Skeptical Stranger (20 Scenarios)</option>
         </select>
       </div>
 
       <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 flex items-start gap-2 text-xs">
         <span class="text-sky-400">📍</span>
-        <div id="settingText" class="text-slate-300 italic">Loading scenario...</div>
+        <div id="settingText" class="text-slate-300 italic leading-relaxed">Loading scenario...</div>
       </div>
     </div>
 
-    <!-- Interactive Dialogue Arena -->
+    <!-- Text Arena -->
     <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Opener</span></div>
+        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Turn 1 (Opener)</span></div>
         <div>Reaction Latency: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
       </div>
 
-      <!-- Dialogue History Stream -->
-      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[190px] max-h-72 overflow-y-auto" id="transcriptBox">
+      <!-- Dialogue History -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[200px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
-          <div class="italic text-slate-600 text-center py-6">Type your opening observation below and hit Enter...</div>
+          <div class="italic text-slate-600 text-center py-8">Type your observation or banter line below and press Enter...</div>
         </div>
       </div>
 
-      <!-- Keyboard Input Controls -->
+      <!-- Input Bar -->
       <div class="flex items-center gap-2">
-        <input type="text" id="userInput" placeholder="Type your banter line..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        <input type="text" id="userInput" placeholder="Type your line here and press Enter..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
         
         <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg shrink-0">
           <span>Send</span> ⚡
@@ -102,12 +102,12 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>Press <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Enter</kbd> to submit immediately. Timer runs from partner response.</span>
-        <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Setting</button>
+        <span>Drill runs for 4 full exchanges. Timer measures seconds between partner reply and your submission.</span>
+        <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
 
-    <!-- Scorecard Section -->
+    <!-- Comprehensive Scorecard -->
     <div id="scorecardSection" class="bg-slate-900 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-sky-400 flex items-center gap-2">
@@ -118,7 +118,7 @@
         </span>
       </div>
 
-      <!-- Score Metrics Grid -->
+      <!-- Metrics -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -142,18 +142,18 @@
         </div>
       </div>
 
-      <!-- Coaching Analysis -->
+      <!-- Coaching -->
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
           <div id="speedCritique" class="text-slate-300">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-          <div class="font-bold text-emerald-300 mb-1">🚀 Upgraded Alternative:</div>
+          <div class="font-bold text-emerald-300 mb-1">🚀 Upgraded Alternative Line:</div>
           <div id="lineUpgrade" class="text-slate-300 italic">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-          <div class="font-bold text-amber-300 mb-1">💡 Key Anchor:</div>
+          <div class="font-bold text-amber-300 mb-1">💡 Key Anchor for Next Round:</div>
           <div id="keyAnchor" class="text-slate-300 font-semibold">--</div>
         </div>
       </div>
@@ -166,20 +166,21 @@
   </div>
 
   <script>
+    // 7 TIERS x 20 UNIQUE SCENARIOS (140 SCENARIOS TOTAL)
     const SCENARIOS = {
       level1: {
-        instructions: "Respond with 1 short, witty, grounded sentence (max 15 words). Match banter naturally.",
+        instructions: "Respond in 1 punchy, natural, grounded sentence (max 15 words). Match casual low-stakes banter.",
         settings: [
-          "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every order.",
+          "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every single order.",
           "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
           "Standing in a long line at a popular Sunday morning bagel bakery watching the chaotic kitchen staff.",
           "Sitting on a park bench holding an iced coffee while watching an unruly pack of dogs play at the dog park.",
-          "Standing by the baggage carousel at an airport waiting for luggage to appear.",
+          "Standing by the baggage carousel at an airport waiting for luggage to start dropping.",
           "Looking at artisanal sourdough loaves at a Saturday morning farmers market stand.",
           "Waiting for the elevator in the lobby of a modern co-working office building on a Friday afternoon.",
-          "Holding a shopping basket waiting in the express checkout lane at a crowded gourmet grocery store.",
+          "Holding a basket waiting in the express checkout lane at a crowded gourmet grocery store.",
           "Waiting for your car at a busy suburban car wash viewing area.",
-          "Standing in line at a food truck festival trying to decide between two complicated fusion taco menus.",
+          "Standing in line at a food truck festival trying to decide between two complicated taco fusion menus.",
           "Browsing plants and succulents in the greenhouse section of a garden nursery.",
           "Waiting in the pickup line at a busy downtown juice and smoothie bar.",
           "Standing on a sunny train platform waiting for the morning commuter express train.",
@@ -193,9 +194,9 @@
         ]
       },
       level2: {
-        instructions: "Respond with 1 punchy playful sentence. Challenge clichés, reward funny assumptions.",
+        instructions: "Respond in 1-2 punchy sentences. Challenge clichés, reward funny assumptions, maintain playful social flow.",
         settings: [
-          "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding sparkling water.",
+          "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a sparkling water.",
           "Browsing rare vintage vinyl records at a local weekend pop-up fair.",
           "Browsing items at a silent charity auction while sipping champagne.",
           "Tasting boutique extra-virgin olive oils at a specialty food festival booth.",
@@ -218,10 +219,10 @@
         ]
       },
       level3: {
-        instructions: "Respond in 1-2 short warm sentences. Banter about the food or host with lively social flow.",
+        instructions: "Respond in 1-2 warm, energetic sentences. Banter about the host, the food, or mutual connections.",
         settings: [
           "A close friend of the host sitting across the table at an intimate eight-person suburban dinner party.",
-          "Hanging around the kitchen island at a friend's housewarming party helping open wine bottles.",
+          "Hanging around the kitchen island at a friend's housewarming party helping uncork wine bottles.",
           "Sitting around a backyard fire pit at an evening get-together with mutual acquaintances.",
           "Sharing a long communal wooden table at a scenic hillside vineyard on a sunny afternoon.",
           "Sitting at a chef's counter group tasting dinner where the courses are getting progressively theatrical.",
@@ -243,13 +244,13 @@
         ]
       },
       level4: {
-        instructions: "Max 1 punchy high-energy sentence (<12 words). Quick and hype.",
+        instructions: "Keep replies ultra-brief and punchy (1 sentence, <12 words). Match high concert energy and vibe.",
         settings: [
           "Standing near the soundboard between sets at a crowded indoor indie rock venue.",
           "Waiting in a slow beverage line on the lawn at an outdoor summer amphitheater festival.",
           "Leaning against the balcony railing at an electronic dance music venue between artist sets.",
-          "Sitting at a small front-row table at an intimate late-night jazz club while the quartet takes a break.",
-          "Cooling off on the outdoor smoking patio of an underground warehouse music show.",
+          "Sitting at a small front-row table at an intimate late-night jazz club while the quartet takes a short break.",
+          "Cooling off on the outdoor patio of an underground warehouse music show.",
           "Standing near the stage rail waiting for the headline band to take the stage at a packed theater.",
           "Grabbing a slice of late-night pizza at the concession stand inside a historic music hall.",
           "Standing by the merch booth looking at vintage band tour t-shirts after a loud rock set.",
@@ -268,9 +269,9 @@
         ]
       },
       level5: {
-        instructions: "Grounded 1-sentence reply. Appreciate dry self-amusement, dislike try-hard pickup lines.",
+        instructions: "Respond in 1 grounded, concise sentence. Appreciate dry self-amused commiseration; reject try-hard pick-up lines.",
         settings: [
-          "Wiping down a barbell station after completing a brutal conditioning circuit class.",
+          "Wiping down a barbell station after completing a brutal conditioning circuit class, catching your breath.",
           "Refilling a water bottle near the turf sprinting area between heavy sled pushes.",
           "Rolling out your back on a foam roller in the gym mobility corner after a tough lifting session.",
           "Putting away heavy dumbbells on the rack after finishing a set of shoulder presses.",
@@ -293,9 +294,9 @@
         ]
       },
       level6: {
-        instructions: "Flirtatious, witty, 1-2 punchy sentences. Flip frames with charm.",
+        instructions: "Respond with witty, flirtatious frame control in 1-2 punchy sentences. Flip assumptions with charm.",
         settings: [
-          "Waiting for the bartender at a crowded speakeasy cocktail lounge on a Friday night.",
+          "Waiting for the bartender at a crowded, dimly lit speakeasy cocktail lounge on a Friday night.",
           "Sitting on a plush leather sofa at an upscale hotel bar enjoying an Old Fashioned.",
           "Leaning on the railing of a crowded rooftop bar enjoying a summer sunset drink.",
           "Standing near the oyster bar at an energetic coastal seafood tavern during happy hour.",
@@ -318,11 +319,11 @@
         ]
       },
       level7: {
-        instructions: "Start dry and skeptical in 1 short sentence. Only warm up if user shows genuine humor.",
+        instructions: "Start dry, concise, and skeptical in 1 sentence. Only warm up if the user demonstrates genuine unbothered warmth and wit.",
         settings: [
-          "Sitting at an airport departure gate on a three-hour flight delay reading a dense novel.",
+          "Sitting at an airport departure gate on a three-hour flight delay reading a dense novel, looking tired.",
           "Sitting alone with a laptop in a quiet hotel lobby bar catching up on work emails.",
-          "Waiting for a delayed commuter train on a freezing winter evening platform.",
+          "Waiting for a delayed commuter train on a freezing winter evening platform, looking unenthusiastic.",
           "Waiting in a slow line at the post office holding three heavy cardboard boxes.",
           "Sitting on an airplane in the window seat while boarding is stalled in the aisle.",
           "Browsing an aisle at the pharmacy while waiting for a prescription order to be filled.",
@@ -351,15 +352,13 @@
     let reactionTimes = [];
     let partnerCompletedTime = null;
 
-    // 1. API Key Drawer Setup
+    // 1. API Key Drawer Logic
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
     if (savedKey) {
       document.getElementById("apiKeyInput").value = savedKey;
       document.getElementById("apiKeySection").classList.add("hidden");
       document.getElementById("keyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400";
-      document.getElementById("keyStatusText").textContent = "🔑 Key Active";
-    } else {
-      document.getElementById("apiKeySection").classList.remove("hidden");
+      document.getElementById("keyStatusText").textContent = "⚙️ Key Active";
     }
 
     document.getElementById("toggleKeyBtn").onclick = () => {
@@ -372,12 +371,12 @@
         localStorage.setItem("GEMINI_API_KEY", k);
         document.getElementById("keySavedNotice").classList.remove("hidden");
         document.getElementById("keyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400";
-        document.getElementById("keyStatusText").textContent = "🔑 Key Active";
-        setTimeout(() => document.getElementById("apiKeySection").classList.add("hidden"), 400);
+        document.getElementById("keyStatusText").textContent = "⚙️ Key Active";
+        setTimeout(() => document.getElementById("apiKeySection").classList.add("hidden"), 500);
       }
     };
 
-    // 2. Persistent History Tracker
+    // 2. Persistent Scoring History
     function loadHistoricalStats() {
       const history = JSON.parse(localStorage.getItem("BANTER_SCORE_HISTORY") || "[]");
       if (!history.length) return;
@@ -394,7 +393,7 @@
       document.getElementById("statPassRate").textContent = `${passRate}%`;
     }
 
-    function saveScoreToHistory(scoreObj, avgLatency) {
+    function recordDrillScore(scoreObj, avgLatency) {
       const history = JSON.parse(localStorage.getItem("BANTER_SCORE_HISTORY") || "[]");
       history.push({
         date: new Date().toISOString(),
@@ -408,7 +407,56 @@
       loadHistoricalStats();
     }
 
-    // 3. Drill Flow
+    // 3. Robust Multi-Model Endpoint Fallback
+    async function executeModelCall(prompt, isJson = false) {
+      const rawKey = localStorage.getItem("GEMINI_API_KEY");
+      if (!rawKey) {
+        document.getElementById("apiKeySection").classList.remove("hidden");
+        alert("Please enter and save your Gemini API Key first.");
+        throw new Error("Missing Key");
+      }
+      const apiKey = rawKey.trim();
+
+      // Robust fallback list across all current Gemini models
+      const modelsToTry = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash"
+      ];
+
+      let lastErr = "";
+      for (const model of modelsToTry) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: isJson ? 700 : 50,
+            temperature: isJson ? 0.1 : 0.7,
+            responseMimeType: isJson ? "application/json" : "text/plain"
+          }
+        };
+
+        try {
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await resp.json();
+          if (resp.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+            return data.candidates[0].content.parts[0].text.trim();
+          } else {
+            lastErr = data.error?.message || `HTTP ${resp.status}`;
+          }
+        } catch (e) {
+          lastErr = e.message;
+        }
+      }
+      throw new Error(lastErr || "All model endpoints failed.");
+    }
+
+    // 4. Drill Execution Loop
     function selectRandomSetting() {
       currentTier = document.getElementById("scenarioSelect").value;
       const pool = SCENARIOS[currentTier];
@@ -422,9 +470,9 @@
       transcriptLog = [];
       reactionTimes = [];
       partnerCompletedTime = null;
-      document.getElementById("turnCounter").textContent = "Opener";
+      document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
       document.getElementById("reactionDisplay").textContent = "--";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-6">Type your opening observation below and hit Enter...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or banter line below and press Enter...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       
       const inputEl = document.getElementById("userInput");
@@ -453,36 +501,6 @@
       msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
       feed.appendChild(msg);
       document.getElementById("transcriptBox").scrollTop = document.getElementById("transcriptBox").scrollHeight;
-    }
-
-    async function callGemini(prompt, isJson = false) {
-      const rawKey = localStorage.getItem("GEMINI_API_KEY");
-      if (!rawKey) {
-        document.getElementById("apiKeySection").classList.remove("hidden");
-        alert("Please enter and save your API Key first.");
-        throw new Error("Missing Key");
-      }
-      const apiKey = rawKey.trim();
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: isJson ? 600 : 40,
-          temperature: isJson ? 0.2 : 0.7,
-          responseMimeType: isJson ? "application/json" : "text/plain"
-        }
-      };
-
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error?.message || "API Error");
-      return data.candidates[0].content.parts[0].text.trim();
     }
 
     async function handleUserSubmit() {
@@ -520,7 +538,7 @@ ${dialogueStr}
 Partner:`;
 
       try {
-        const partnerReply = await callGemini(personaPrompt);
+        const partnerReply = await executeModelCall(personaPrompt);
         appendMessage("assistant", partnerReply);
         transcriptLog.push({ role: "assistant", text: partnerReply });
         
@@ -528,12 +546,12 @@ Partner:`;
         exchangesCount++;
 
         if (exchangesCount < 4) {
-          document.getElementById("turnCounter").textContent = `Exchange ${exchangesCount + 1} of 4`;
+          document.getElementById("turnCounter").textContent = `Turn ${exchangesCount + 1} of 4`;
           inputEl.disabled = false;
           document.getElementById("sendBtn").disabled = false;
           inputEl.focus();
         } else {
-          document.getElementById("turnCounter").textContent = "Completed";
+          document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
           generateScorecard();
         }
       } catch (err) {
@@ -547,11 +565,11 @@ Partner:`;
     async function generateScorecard() {
       const avgLatency = reactionTimes.length 
         ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
-        : "2.8";
+        : "2.5";
 
       const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
       const criticPrompt = `
-      Charisma coach evaluation for:
+      Charisma coach evaluation:
       Setting: ${currentSetting}
       Avg Latency: ${avgLatency}s
       Transcript:
@@ -571,7 +589,7 @@ Partner:`;
       }`;
 
       try {
-        const rawJson = await callGemini(criticPrompt, true);
+        const rawJson = await executeModelCall(criticPrompt, true);
         const clean = rawJson.replace(/```json/g, "").replace(/```/g, "").trim();
         const score = JSON.parse(clean);
 
@@ -586,10 +604,9 @@ Partner:`;
         document.getElementById("keyAnchor").textContent = score.key_anchor;
 
         document.getElementById("scorecardSection").classList.remove("hidden");
-        
-        saveScoreToHistory(score, avgLatency);
+        recordDrillScore(score, avgLatency);
       } catch (e) {
-        console.error("Scoring error:", e);
+        console.error("Scorecard generation error:", e);
       }
     }
 
@@ -603,7 +620,7 @@ Partner:`;
       if (e.key === "Enter") handleUserSubmit();
     };
 
-    // Initialize stats and scenario
+    // Auto-init
     loadHistoricalStats();
     selectRandomSetting();
   </script>
