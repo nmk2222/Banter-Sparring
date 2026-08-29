@@ -2,10 +2,548 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Charisma Lab Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Charisma & Banter Lab | Real-Time Live Sparring</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .pulse-ring {
+      animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-border {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.08); }
+    }
+  </style>
 </head>
-<body style="background-color: #0f172a; color: #38bdf8; font-family: sans-serif; text-align: center; padding: 50px;">
-  <h1>⚡ Charisma & Banter Lab</h1>
-  <p style="color: #cbd5e1;">If you can see this text, your GitHub Pages site is live and connected!</p>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
+  
+  <div class="max-w-2xl w-full flex flex-col gap-5">
+    
+    <!-- Top Header -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
+          ⚡ Charisma & Banter Lab
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">Real-time sparring with latency tracking and charisma scoring</p>
+      </div>
+      <div id="statusBadge" class="text-xs px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+        Ready
+      </div>
+    </div>
+
+    <!-- API Key Section (Stored locally in your browser only) -->
+    <div id="apiKeySection" class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local storage</span>
+      </div>
+      <div class="flex gap-2">
+        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
+        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
+      </div>
+    </div>
+
+    <!-- Scenario Selector & Setting -->
+    <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <label class="text-xs font-semibold text-slate-300">Training Scenario Tier:</label>
+        <select id="scenarioSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+          <option value="level1">Level 1: The Casual Line Opener (Low Stakes)</option>
+          <option value="level2">Level 2: The Gallery Mixer (Neutral Ground)</option>
+          <option value="level3">Level 3: The Dinner Party / Mutual Friends (Social Flow)</option>
+          <option value="level4">Level 4: The Music Festival / Concert (High Energy)</option>
+          <option value="level5">Level 5: The Fitness Class / Gym (Low Friction)</option>
+          <option value="level6">Level 6: The Lounge (Flirtatious & Polarity)</option>
+          <option value="level7">Level 7: The Skeptical Stranger (Frame Control)</option>
+        </select>
+      </div>
+
+      <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 flex items-start gap-2 text-xs">
+        <span class="text-sky-400">📍</span>
+        <div id="settingText" class="text-slate-300 italic">Click Start Drill to generate a randomized environment.</div>
+      </div>
+    </div>
+
+    <!-- Interactive Dialogue Arena -->
+    <div class="bg-slate-800/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
+      
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Opener</span></div>
+        <div>Last Reaction: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
+      </div>
+
+      <!-- Dialogue History Stream -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[160px] max-h-72 overflow-y-auto" id="transcriptBox">
+        <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
+          <div class="italic text-slate-600 text-center py-6">Select your scenario above and enter your line below...</div>
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="flex gap-2">
+        <input type="text" id="userInput" placeholder="Deliver your observation line..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1">
+          <span>Send</span> ⚡
+        </button>
+      </div>
+
+      <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
+        <span>Press Enter or click Send to fire your reply.</span>
+        <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Setting</button>
+      </div>
+    </div>
+
+    <!-- Scorecard Section -->
+    <div id="scorecardSection" class="bg-slate-800 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h2 class="text-lg font-bold text-sky-400 flex items-center gap-2">
+          📊 Charisma & Timing Scorecard
+        </h2>
+        <span id="scoreVerdict" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          Passed
+        </span>
+      </div>
+
+      <!-- Score Metrics Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
+          <div id="spontaneityScore" class="text-xl font-bold text-sky-400 mt-1">--</div>
+        </div>
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">Independence</div>
+          <div id="independenceScore" class="text-xl font-bold text-indigo-400 mt-1">--</div>
+        </div>
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">Playfulness</div>
+          <div id="playfulnessScore" class="text-xl font-bold text-emerald-400 mt-1">--</div>
+        </div>
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">Brevity</div>
+          <div id="brevityScore" class="text-xl font-bold text-amber-400 mt-1">--</div>
+        </div>
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 col-span-2 sm:col-span-1">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">Overall</div>
+          <div id="overallScore" class="text-xl font-bold text-rose-400 mt-1">--</div>
+        </div>
+      </div>
+
+      <!-- Coaching Analysis -->
+      <div class="flex flex-col gap-3 text-xs">
+        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+          <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
+          <div id="speedCritique" class="text-slate-300">--</div>
+        </div>
+        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+          <div class="font-bold text-emerald-300 mb-1">🚀 Upgraded Line Alternative:</div>
+          <div id="lineUpgrade" class="text-slate-300 italic">--</div>
+        </div>
+        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+          <div class="font-bold text-amber-300 mb-1">💡 Key Anchor for Next Round:</div>
+          <div id="keyAnchor" class="text-slate-300 font-semibold">--</div>
+        </div>
+      </div>
+
+      <button id="nextDrillBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition">
+        🔄 Start Next Drill
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // 20 Settings per Level
+    const SCENARIOS = {
+      level1: {
+        instructions: "Keep replies strictly under 1-2 punchy sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
+        settings: [
+          "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every order.",
+          "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
+          "Standing in a long line at a popular Sunday morning bagel bakery watching the chaotic kitchen staff.",
+          "Sitting on a park bench holding an iced coffee while watching an unruly pack of dogs play at the dog park.",
+          "Standing by the baggage carousel at an airport waiting for luggage to appear.",
+          "Looking at artisanal sourdough loaves at a Saturday morning farmers market stand.",
+          "Waiting for the elevator in the lobby of a modern co-working office building on a Friday afternoon.",
+          "Holding a shopping basket waiting in the express checkout lane at a crowded gourmet grocery store.",
+          "Waiting for your car at a busy suburban car wash viewing area.",
+          "Standing in line at a food truck festival trying to decide between two complicated fusion taco menus.",
+          "Browsing plants and succulents in the greenhouse section of a garden nursery.",
+          "Waiting in the pickup line at a busy downtown juice and smoothie bar.",
+          "Standing on a sunny train platform waiting for the morning commuter express train.",
+          "Waiting at the counter of a boutique gelato shop sampling different exotic flavors.",
+          "Browsing high-end kitchenware and espresso machines in a home goods store.",
+          "Standing in line at a gourmet donut shop admiring an overly elaborate pastry display.",
+          "Waiting for a takeaway matcha latte while sheltering under an awning from sudden rain.",
+          "Looking at local honey and hot sauce bottles at an outdoor community harvest fair.",
+          "Waiting near the customer service desk at an upscale department store.",
+          "Sitting in the courtyard of an open-air shopping village holding shopping bags."
+        ]
+      },
+      level2: {
+        instructions: "Keep replies under 2 sentences. Reward playful assumptions, challenge boring clichés, match the user's banter.",
+        settings: [
+          "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a glass of sparkling water.",
+          "Browsing rare vintage vinyl records at a local weekend pop-up fair.",
+          "Browsing items at a silent charity auction while sipping champagne.",
+          "Tasting boutique extra-virgin olive oils at a specialty food festival booth.",
+          "Examining mid-century modern furniture pieces at a curated architectural flea market.",
+          "Standing in the courtyard at a historic botanical garden during an evening members-only event.",
+          "Attending an outdoor screening of an indie film sitting on a picnic blanket with wine.",
+          "Standing near the appetizer spread at an alumni evening gathering.",
+          "Browsing an artisan watch and craft leather market in an open-air pavilion.",
+          "Waiting for a photography exhibit lecture to begin in a museum auditorium lobby.",
+          "Sampling micro-batch cheeses at a gourmet food and wine expo.",
+          "Browsing rare vintage books at an antiquarian book fair.",
+          "Checking out handcrafted ceramics at a local studio open house.",
+          "Holding a program while waiting for an independent architecture film screening to start.",
+          "Standing by a classic vintage sports car at a charity concourse auto show.",
+          "Browsing original graphic prints at a contemporary local artist market.",
+          "Waiting in the foyer of a restored art deco theater before an acoustic performance.",
+          "Sampling dark single-origin chocolate bars at an artisan confectioner showcase.",
+          "Examining restored mid-century lighting fixtures in a design studio showroom.",
+          "Mingling on the outdoor sculpture terrace of a museum overlooking the water."
+        ]
+      },
+      level3: {
+        instructions: "Respond well to funny observations about the food/host, playful assumptions about how people know each other, and lively storytelling. Max 2 short sentences.",
+        settings: [
+          "A close friend of the host sitting across the table at an intimate eight-person suburban dinner party.",
+          "Hanging around the kitchen island at a friend's housewarming party helping open wine bottles.",
+          "Sitting around a backyard fire pit at an evening get-together with mutual acquaintances.",
+          "Sharing a long communal wooden table at a scenic hillside vineyard on a sunny afternoon.",
+          "Sitting at a chef's counter group tasting dinner where the courses are getting progressively theatrical.",
+          "Helping clean up dessert plates in the kitchen while laughing about the host's burnt entree.",
+          "Hanging out on the deck at a summer lake house barbecue with a casual group of friends.",
+          "Sitting on a patio sectional at a mutual friend's birthday tapas dinner.",
+          "Attending a family-style Italian Sunday supper at a bustling neighborhood trattoria.",
+          "Sitting around a fondue pot at a winter cabin ski weekend dinner.",
+          "Hanging out by the grill with a drink while the host attempts to smoke a brisket.",
+          "Tasting blindfolded wines at a casual friend group wine-tasting party.",
+          "Sitting at a rooftop communal dinner table watching the city skyline as dinner winds down.",
+          "Cracking open crab legs at an informal outdoor summer seafood boil.",
+          "Sitting by the pool patio helping assemble gourmet burgers at an afternoon cookout.",
+          "Sharing a charcuterie board on the porch of a country farmhouse weekend retreat.",
+          "Passing dessert platters around a candlelit garden patio dinner.",
+          "Gathered around an outdoor pizza oven waiting for custom wood-fired pies.",
+          "Sitting on a cozy living room sectional during an informal post-dinner game night.",
+          "Helping uncork magnum bottles at an anniversary celebration dinner."
+        ]
+      },
+      level4: {
+        instructions: "Keep replies extremely brief (1 punchy sentence, max 15 words). Match high enthusiasm. React well to situational comments.",
+        settings: [
+          "Standing near the soundboard between sets at a crowded indoor indie rock venue.",
+          "Waiting in a slow beverage line on the lawn at an outdoor summer amphitheater festival.",
+          "Leaning against the balcony railing at an electronic dance music venue between artist sets.",
+          "Sitting at a small front-row table at an intimate late-night jazz club while the quartet takes a short break.",
+          "Cooling off on the outdoor smoking patio of an underground warehouse music show.",
+          "Standing near the stage rail waiting for the headline band to take the stage at a packed theater.",
+          "Grabbing a slice of late-night pizza at the concession stand inside a historic music hall.",
+          "Standing by the merch booth looking at vintage band tour t-shirts after a loud rock set.",
+          "Waiting for friends near the hydration station at a massive multi-stage music festival.",
+          "Hanging out in the mezzanine lounge of a concert venue holding two overpriced craft beers.",
+          "Sitting on the grass hill at an afternoon bluegrass festival listening to the opening act.",
+          "Standing in the lobby of an acoustic concert hall at intermission discussing the performance.",
+          "Watching the DJ set up gear from the edge of the dance floor at a rooftop sunset party.",
+          "Standing near the encore barrier waiting for the band to come back out for one last song.",
+          "Walking through the illuminated festival art installations between late-night stage sets.",
+          "Standing by the sound tent sheltering under an umbrella during a festival rain delay.",
+          "Leaning on the wooden railing of an outdoor pier concert watching the sun go down.",
+          "Waiting by the artist stage door after a small club show holding a ticket stub.",
+          "Resting on the turf at an all-day funk and soul festival listening to a brass band.",
+          "Waiting in the coat check queue at 1 AM after a high-energy dance show."
+        ]
+      },
+      level5: {
+        instructions: "Keep replies concise and grounded (max 2 short sentences). Appreciate self-amused commiseration, dislike try-hard pickup lines.",
+        settings: [
+          "Wiping down a barbell station after completing a brutal conditioning circuit class, catching your breath.",
+          "Refilling a water bottle near the turf sprinting area between heavy sled pushes.",
+          "Rolling out your back on a foam roller in the gym mobility corner after a tough lifting session.",
+          "Putting away heavy dumbbells on the rack after finishing a set of shoulder presses.",
+          "Stretching near the door after a demanding hot yoga or power Pilates session.",
+          "Adjusting your indoor cycling bike pedals before a spin class begins.",
+          "Taking a short breather on a plyo box between rowing machine intervals.",
+          "Chalking your hands at the pull-up rig while resting between calisthenics sets.",
+          "Stepping out of the infrared sauna and sitting on the relaxation bench in a wellness studio.",
+          "Waiting for the cold plunge tub to open up after a heavy leg workout.",
+          "Tightening your lifting belt near the squat rack while switching weight plates.",
+          "Untying your running shoes on a locker room bench after an outdoor track workout.",
+          "Mixing a protein shaker bottle at the smoothie counter of a boutique climbing gym.",
+          "Adjusting resistance bands on a Pilates reformer machine before class starts.",
+          "Resting your arms on a heavy punching bag after a boxing conditioning round.",
+          "Catching your breath on the turf after a grueling series of kettlebell swings.",
+          "Adjusting your swim goggles at the edge of a 25-meter lap pool before swim drills.",
+          "Putting away weighted vests after an uphill incline treadmill session.",
+          "Sitting on a balance ball cooling down after a high-intensity interval session.",
+          "Wiping sweat off your brow near the pull-up bars at an outdoor beach workout park."
+        ]
+      },
+      level6: {
+        instructions: "Respond well to confident frame-flipping and light teasing. Never be rude; maintain high social warmth. Max 2 punchy sentences.",
+        settings: [
+          "Waiting for the bartender at a crowded, dimly lit speakeasy cocktail lounge on a Friday night.",
+          "Sitting on a plush leather sofa at an upscale hotel bar enjoying an Old Fashioned.",
+          "Leaning on the railing of a crowded rooftop bar enjoying a summer sunset drink.",
+          "Standing near the oyster bar at an energetic coastal seafood tavern during happy hour.",
+          "Sitting at a candlelit high-top table at a vibrant tapas and mezcal bar.",
+          "Browsing the cocktail menu at an intimate velvet-draped piano bar.",
+          "Waiting for a table at the bar of a buzzing Michelin-starred downtown bistro.",
+          "Standing near the fireplace lounge of an alpine ski resort bar after a day on the slopes.",
+          "Ordering a bespoke botanical gin and tonic at a garden terrace lounge.",
+          "Sharing bar space while waiting for a glass of natural wine at a lively neighborhood enoteca.",
+          "Leaning against a marble cocktail counter watching a mixologist carve clear ice blocks.",
+          "Sitting in the courtyard lounge of a boutique hotel with a late-night cocktail.",
+          "Standing by the DJ booth at an upscale after-work lounge listening to deep house music.",
+          "Sitting at the dark polished mahogany bar of a classic historic jazz lounge.",
+          "Waiting for a handcrafted mezcal cocktail at a lively subterranean basement bar.",
+          "Leaning on a high-top table on the heated terrace of a waterfront bistro.",
+          "Looking at rare Japanese whiskies behind the glass of an intimate listening bar.",
+          "Sitting on a velvet barstool waiting for a signature martini at a vintage steakhouse bar.",
+          "Sharing a communal high-top bench at a trendy craft cider and beer garden.",
+          "Enjoying an aperitivo spritz at a stylish open-air Italian plaza lounge."
+        ]
+      },
+      level7: {
+        instructions: "Start with concise, slightly dry/skeptical replies. Only warm up if the user uses genuine warmth, self-amusement, and observational play. Max 2 sentences.",
+        settings: [
+          "Sitting at an airport departure gate on a three-hour flight delay reading a dense novel, looking tired.",
+          "Sitting alone with a laptop in a quiet hotel lobby bar catching up on work emails.",
+          "Waiting for a delayed commuter train on a freezing winter evening platform, looking unenthusiastic.",
+          "Waiting in a slow line at the post office holding three heavy cardboard boxes.",
+          "Sitting on an airplane in the window seat while boarding is stalled in the aisle.",
+          "Browsing an aisle at the pharmacy while waiting for a prescription order to be filled.",
+          "Waiting in a hotel check-in line where the computer system is currently frozen.",
+          "Sitting at an auto service center waiting room reading magazines while your car is inspected.",
+          "Standing in line at the passport renewal office clutching a stack of paperwork.",
+          "Sitting on a park bench working on a tablet, looking focused and slightly guarded.",
+          "Waiting for takeout food at a crowded restaurant counter where orders are running late.",
+          "Standing near the coat check line at a large conference hall at the end of a long seminar day.",
+          "Waiting for an elevator in a silent medical office building hallway.",
+          "Standing in a slow line at the dry cleaners holding an armful of suits.",
+          "Sitting in the tire center waiting lounge staring at a muted television screen.",
+          "Waiting for a delayed rideshare on a rainy downtown street corner under an umbrella.",
+          "Standing in the basement parking garage payment booth line holding a parking ticket.",
+          "Waiting in the customer service return queue at an electronics superstore on a busy Saturday.",
+          "Sitting in the hallway outside a courthouse waiting room reviewing documents.",
+          "Waiting for your takeaway order in the entryway of a crowded noodle shop during a blizzard."
+        ]
+      }
+    };
+
+    let currentTier = "level1";
+    let currentSetting = "";
+    let exchangesCount = 0;
+    let transcriptLog = [];
+    let reactionTimes = [];
+    let partnerCompletedTime = null;
+
+    // Load API Key from local browser storage
+    const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
+    if (savedKey) {
+      document.getElementById("apiKeyInput").value = savedKey;
+      document.getElementById("keySavedNotice").classList.remove("hidden");
+    }
+
+    document.getElementById("saveKeyBtn").onclick = () => {
+      const k = document.getElementById("apiKeyInput").value.trim();
+      if (k) {
+        localStorage.setItem("GEMINI_API_KEY", k);
+        document.getElementById("keySavedNotice").classList.remove("hidden");
+      }
+    };
+
+    function selectRandomSetting() {
+      currentTier = document.getElementById("scenarioSelect").value;
+      const pool = SCENARIOS[currentTier];
+      currentSetting = pool.settings[Math.floor(Math.random() * pool.settings.length)];
+      document.getElementById("settingText").textContent = currentSetting;
+      resetDrillState();
+    }
+
+    function resetDrillState() {
+      exchangesCount = 0;
+      transcriptLog = [];
+      reactionTimes = [];
+      partnerCompletedTime = null;
+      document.getElementById("turnCounter").textContent = "Opener";
+      document.getElementById("reactionDisplay").textContent = "--";
+      document.getElementById("transcriptFeed").innerHTML = "";
+      document.getElementById("scorecardSection").classList.add("hidden");
+      document.getElementById("userInput").disabled = false;
+      document.getElementById("sendBtn").disabled = false;
+    }
+
+    function appendMessage(role, text, latency = null) {
+      const feed = document.getElementById("transcriptFeed");
+      const msg = document.createElement("div");
+      msg.className = `p-2.5 rounded-xl text-xs max-w-[85%] ${
+        role === 'user' 
+          ? 'bg-sky-950/80 border border-sky-800 text-sky-200 self-end ml-auto' 
+          : 'bg-slate-900 border border-slate-800 text-slate-200 self-start mr-auto'
+      }`;
+      
+      const tag = role === 'user' 
+        ? (latency !== null ? `You (⚡ ${latency}s):` : 'You (Opener):')
+        : 'Partner:';
+        
+      msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
+      feed.appendChild(msg);
+      document.getElementById("transcriptBox").scrollTop = document.getElementById("transcriptBox").scrollHeight;
+    }
+
+    async function callGemini(prompt, isJson = false) {
+      const apiKey = localStorage.getItem("GEMINI_API_KEY");
+      if (!apiKey) {
+        alert("Please enter and save your Gemini API Key first.");
+        throw new Error("Missing API Key");
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: isJson ? 800 : 50,
+          temperature: isJson ? 0.2 : 0.7,
+          responseMimeType: isJson ? "application/json" : "text/plain"
+        }
+      };
+
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error?.message || "API Error");
+      }
+      return data.candidates[0].content.parts[0].text.trim();
+    }
+
+    async function handleUserSubmit() {
+      const inputEl = document.getElementById("userInput");
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      const now = performance.now();
+      let measuredLatency = null;
+
+      if (exchangesCount > 0 && partnerCompletedTime !== null) {
+        measuredLatency = parseFloat(((now - partnerCompletedTime) / 1000).toFixed(1));
+        reactionTimes.push(measuredLatency);
+        document.getElementById("reactionDisplay").textContent = `${measuredLatency}s`;
+      }
+
+      inputEl.value = "";
+      appendMessage("user", text, measuredLatency);
+      transcriptLog.push({ role: "user", text, latency: measuredLatency });
+
+      // Build Prompt
+      const pool = SCENARIOS[currentTier];
+      const dialogueStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
+      const personaPrompt = `
+      Scenario: ${currentSetting}
+      Rules: ${pool.instructions}
+
+      Dialogue History:
+      ${dialogueStr}
+
+      Respond strictly in character as the other person. Keep it under 2 punchy, natural sentences.
+      `;
+
+      try {
+        const partnerReply = await callGemini(personaPrompt);
+        appendMessage("assistant", partnerReply);
+        transcriptLog.push({ role: "assistant", text: partnerReply });
+        
+        partnerCompletedTime = performance.now();
+        exchangesCount++;
+
+        if (exchangesCount < 4) {
+          document.getElementById("turnCounter").textContent = `Exchange ${exchangesCount + 1} of 4`;
+        } else {
+          document.getElementById("turnCounter").textContent = "Completed";
+          inputEl.disabled = true;
+          document.getElementById("sendBtn").disabled = true;
+          generateScorecard();
+        }
+      } catch (err) {
+        console.error(err);
+        appendMessage("assistant", "[Error generating reply. Please check your API key.]");
+      }
+    }
+
+    async function generateScorecard() {
+      const avgLatency = reactionTimes.length 
+        ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
+        : "3.0";
+
+      const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
+      const criticPrompt = `
+      You are a world-class conversational charisma coach.
+      Analyze this banter transcript:
+      Scenario: ${currentSetting}
+      User Average Reaction Latency: ${avgLatency}s
+
+      [TRANSCRIPT]
+      ${transcriptStr}
+
+      Evaluate User based on:
+      1. Spontaneity (1-10): (<3.5s = 10, 3.5-6s = 8-9, 6-10s = 5-7, >10s = <5)
+      2. Outcome Independence (1-10)
+      3. Playfulness & Frame Control (1-10)
+      4. Brevity (1-10)
+      5. Warmth (1-10)
+
+      Return ONLY valid JSON matching this schema:
+      {
+        "spontaneity": 9,
+        "independence": 8,
+        "playfulness": 7,
+        "brevity": 9,
+        "overall": 8.2,
+        "verdict": "Passed",
+        "speed_critique": "string",
+        "upgraded_line": "string",
+        "key_anchor": "string"
+      }`;
+
+      try {
+        const rawJson = await callGemini(criticPrompt, true);
+        const clean = rawJson.replace(/```json/g, "").replace(/```/g, "").trim();
+        const score = JSON.parse(clean);
+
+        document.getElementById("spontaneityScore").textContent = `${score.spontaneity}/10`;
+        document.getElementById("independenceScore").textContent = `${score.independence}/10`;
+        document.getElementById("playfulnessScore").textContent = `${score.playfulness}/10`;
+        document.getElementById("brevityScore").textContent = `${score.brevity}/10`;
+        document.getElementById("overallScore").textContent = `${score.overall}/10`;
+        document.getElementById("scoreVerdict").textContent = score.verdict;
+        document.getElementById("speedCritique").textContent = score.speed_critique;
+        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line}"`;
+        document.getElementById("keyAnchor").textContent = score.key_anchor;
+
+        document.getElementById("scorecardSection").classList.remove("hidden");
+      } catch (e) {
+        console.error("Scoring error:", e);
+      }
+    }
+
+    // Event Listeners
+    document.getElementById("scenarioSelect").onchange = selectRandomSetting;
+    document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
+    document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
+
+    document.getElementById("sendBtn").onclick = handleUserSubmit;
+    document.getElementById("userInput").onkeydown = (e) => {
+      if (e.key === "Enter") handleUserSubmit();
+    };
+
+    // Initial Load
+    selectRandomSetting();
+  </script>
 </body>
 </html>
