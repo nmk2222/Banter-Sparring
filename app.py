@@ -4,6 +4,7 @@ from google.genai import types
 from streamlit_mic_recorder import mic_recorder
 import json
 import random
+import time
 
 st.set_page_config(page_title="Charisma & Banter Lab", layout="centered")
 
@@ -16,7 +17,29 @@ if not api_key:
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-MODEL_NAME = "gemini-3.6-flash"
+PRIMARY_MODEL = "gemini-3.6-flash"
+FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash"]
+
+def generate_with_retry(prompt_or_contents, is_json=False):
+    """Executes model generation with automatic fallback and retries."""
+    models_to_try = [PRIMARY_MODEL] + FALLBACK_MODELS
+    config = types.GenerateContentConfig(response_mime_type="application/json") if is_json else None
+    
+    last_err = None
+    for model_candidate in models_to_try:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_candidate,
+                    contents=prompt_or_contents,
+                    config=config
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                last_err = e
+                time.sleep(1.0)  # Brief pause before retry
+    raise last_err
 
 # Scenarios Library
 SCENARIO_POOLS = {
@@ -158,7 +181,7 @@ if "transcript" not in st.session_state:
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
 
-# Auto-heal state: Calculate completed exchanges strictly from paired turns
+# Completed Exchanges Count
 pairs_count = len(st.session_state.transcript) // 2
 
 # Top Header Layout
@@ -197,7 +220,6 @@ if pairs_count < 4:
     st.write("---")
     st.write(f"**Your Turn (Exchange {pairs_count + 1} of 4):**")
     
-    # Input options side-by-side
     col_mic, col_text = st.columns([1, 2])
     
     with col_mic:
@@ -216,22 +238,18 @@ if pairs_count < 4:
     user_line = None
 
     if audio_record and "bytes" in audio_record and audio_record["bytes"]:
-        with st.spinner("Transcribing your voice..."):
+        with st.spinner("Transcribing voice..."):
             try:
-                transcribe_resp = client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=[
-                        types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
-                        "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
-                    ]
-                )
-                user_line = transcribe_resp.text.strip()
+                user_line = generate_with_retry([
+                    types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
+                    "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
+                ])
             except Exception as e:
                 st.error(f"Audio Transcription Error: {str(e)}")
     elif send_btn and typed_message:
         user_line = typed_message.strip()
 
-    # Generate Response
+    # Generate In-Character Response
     if user_line:
         with st.spinner("Sparring partner responding..."):
             temp_history = list(st.session_state.transcript)
@@ -248,18 +266,14 @@ if pairs_count < 4:
             Respond strictly in character as the other person. Keep it punchy, conversational, and natural.
             """
             try:
-                response = client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=persona_prompt
-                )
-                partner_reply = response.text.strip()
+                partner_reply = generate_with_retry(persona_prompt)
                 
-                # Append both lines to state
+                # Append both lines cleanly
                 st.session_state.transcript.append({"role": "user", "text": user_line})
                 st.session_state.transcript.append({"role": "assistant", "text": partner_reply})
                 st.rerun()
             except Exception as e:
-                st.error(f"API Generation Error: {str(e)}")
+                st.error(f"API Generation Error (Retried): {str(e)}")
 
 else:
     # Round Complete - Evaluation Section
@@ -304,12 +318,8 @@ else:
                 }}
                 """
                 try:
-                    eval_resp = client.models.generate_content(
-                        model=MODEL_NAME,
-                        contents=critic_prompt,
-                        config=types.GenerateContentConfig(response_mime_type="application/json")
-                    )
-                    st.session_state.evaluation = json.loads(eval_resp.text)
+                    eval_raw = generate_with_retry(critic_prompt, is_json=True)
+                    st.session_state.evaluation = json.loads(eval_raw)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Scoring Error: {str(e)}")
