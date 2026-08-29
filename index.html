@@ -31,7 +31,7 @@
     <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all">
       <div class="flex items-center justify-between">
         <label class="text-xs font-semibold text-slate-300">Google AI Studio API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved securely</span>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Active and saved</span>
       </div>
       <div class="flex gap-2">
         <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
@@ -39,7 +39,7 @@
       </div>
     </div>
 
-    <!-- Historical Performance Summary -->
+    <!-- Lifetime Stats History -->
     <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs">
       <div>
         <div class="text-[10px] text-slate-500 uppercase tracking-wider">Drills Done</div>
@@ -59,7 +59,7 @@
       </div>
     </div>
 
-    <!-- Tier & Scenario Selection -->
+    <!-- Scenario Selector & Setting Display -->
     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <label class="text-xs font-semibold text-slate-300">Select Difficulty Tier:</label>
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <!-- Interactive Dialogue Arena -->
+    <!-- Text Arena -->
     <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
@@ -88,14 +88,14 @@
         <div>Reaction Latency: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
       </div>
 
-      <!-- Dialogue Stream -->
+      <!-- Dialogue History -->
       <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[200px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
           <div class="italic text-slate-600 text-center py-8">Type your observation or banter line below and press Enter...</div>
         </div>
       </div>
 
-      <!-- Input Field -->
+      <!-- Input Bar -->
       <div class="flex items-center gap-2">
         <input type="text" id="userInput" placeholder="Type your line here and press Enter..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
         
@@ -110,7 +110,7 @@
       </div>
     </div>
 
-    <!-- Scorecard Section -->
+    <!-- Comprehensive Scorecard -->
     <div id="scorecardSection" class="bg-slate-900 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-sky-400 flex items-center gap-2">
@@ -121,7 +121,7 @@
         </span>
       </div>
 
-      <!-- Metric Tiles -->
+      <!-- Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -172,7 +172,7 @@
     // 7 TIERS x 20 UNIQUE SCENARIOS (140 TOTAL)
     const SCENARIOS = {
       level1: {
-        instructions: "Respond in 1 punchy, natural, grounded sentence (max 15 words). Match casual low-stakes banter.",
+        instructions: "Respond in 1-2 punchy, grounded sentences. Match casual low-stakes banter naturally.",
         settings: [
           "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every single order.",
           "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
@@ -410,7 +410,7 @@
       loadHistoricalStats();
     }
 
-    // 3. Reliable Model Dispatcher (Strict Defensive JSON Checks)
+    // 3. Robust Dispatcher with Clean String Processing
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -420,13 +420,7 @@
       }
       const apiKey = rawKey.trim();
 
-      // Primary: gemini-2.0-flash (fast, standard GA model)
-      // Fallback: gemini-1.5-flash
-      const endpoints = [
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
-      ];
-
+      const endpoints = ["gemini-2.0-flash", "gemini-1.5-flash"];
       let lastError = null;
 
       for (const model of endpoints) {
@@ -434,8 +428,8 @@
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: isJson ? 700 : 50,
-            temperature: isJson ? 0.1 : 0.7,
+            maxOutputTokens: isJson ? 800 : 150,
+            temperature: isJson ? 0.1 : 0.75,
             responseMimeType: isJson ? "application/json" : "text/plain"
           }
         };
@@ -454,13 +448,19 @@
             continue;
           }
 
-          // Defensive safe navigation
           if (data && Array.isArray(data.candidates) && data.candidates.length > 0) {
             const candidate = data.candidates[0];
             if (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
               const text = candidate.content.parts[0].text;
               if (text && typeof text === 'string') {
-                return text.trim();
+                // Strip stray wrapping quotes if returned
+                let clean = text.trim();
+                if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 1) {
+                  clean = clean.substring(1, clean.length - 1).trim();
+                }
+                if (clean.length > 0) {
+                  return clean;
+                }
               }
             }
           }
@@ -479,7 +479,7 @@
       throw new Error(lastError || "All endpoints failed.");
     }
 
-    // 4. Drill Execution State Machine
+    // 4. State Machine
     function selectRandomSetting() {
       currentTier = document.getElementById("scenarioSelect").value;
       const pool = SCENARIOS[currentTier];
@@ -548,17 +548,20 @@
       transcriptLog.push({ role: "user", text, latency: measuredLatency });
 
       const pool = SCENARIOS[currentTier];
-      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'Partner'}: "${t.text}"`).join("\n");
+      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'Partner'}: ${t.text}`).join("\n");
       
       const personaPrompt = `
-Roleplay in 1 short conversational sentence (<15 words).
+You are roleplaying as a real person in a casual conversation.
 Setting: ${currentSetting}
-Instruction: ${pool.instructions}
+Behavior Guidelines: ${pool.instructions}
 
-Dialogue:
+Conversation History:
 ${dialogueStr}
 
-Partner:`;
+Instructions:
+Reply naturally to the last line from 'Me'. Speak in 1-2 realistic, witty conversational sentences. 
+Do not prefix your response with "Partner:" or "You:". Output only the direct dialogue words.
+`;
 
       try {
         const partnerReply = await executeModelCall(personaPrompt);
@@ -592,11 +595,20 @@ Partner:`;
 
       const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
       const criticPrompt = `
-      Charisma coach evaluation:
+      You are a world-class conversational charisma coach.
+      Analyze this banter transcript:
       Setting: ${currentSetting}
-      Avg Latency: ${avgLatency}s
+      Avg Reaction Latency: ${avgLatency}s
+      
       Transcript:
       ${transcriptStr}
+
+      Evaluate User based on:
+      1. Spontaneity (1-10): (<3.5s = 10, 3.5-6s = 8-9, 6-10s = 5-7, >10s = <5)
+      2. Outcome Independence (1-10)
+      3. Playfulness & Frame Control (1-10)
+      4. Brevity (1-10)
+      5. Warmth (1-10)
 
       Return ONLY valid JSON matching this schema:
       {
