@@ -17,33 +17,40 @@ if not api_key:
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-ACTIVE_MODEL = "gemini-3.6-flash"
+# Failover models to eliminate 503 errors completely
+MODEL_CASCADE = [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro"
+]
 
-def fast_generate(prompt, is_json=False):
-    """Ultra-fast, constrained token generation for real-time conversation."""
-    if is_json:
-        cfg = types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.3
-        )
-    else:
-        # Strict max token limit guarantees sub-second execution
-        cfg = types.GenerateContentConfig(
-            max_output_tokens=60,
-            temperature=0.7
-        )
-        
-    resp = client.models.generate_content(
-        model=ACTIVE_MODEL,
-        contents=prompt,
-        config=cfg
-    )
-    return resp.text.strip() if resp and resp.text else ""
+def fast_call(prompt, is_json=False):
+    """Ultra-fast call with automatic multi-model failover."""
+    last_err = None
+    for model_name in MODEL_CASCADE:
+        try:
+            cfg = types.GenerateContentConfig(
+                response_mime_type="application/json" if is_json else None,
+                max_output_tokens=60 if not is_json else 800,
+                temperature=0.7 if not is_json else 0.2
+            )
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=cfg
+            )
+            if resp and resp.text:
+                return resp.text.strip()
+        except Exception as e:
+            last_err = e
+            continue
+    raise last_err
 
 # Scenarios Library
 SCENARIO_POOLS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
-        "instructions": "Keep replies strictly under 1-2 short sentences (under 25 words). React naturally to observations and humor. Do not interrogate. Stay strictly in character.",
+        "instructions": "Keep replies strictly under 1-2 punchy sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
         "settings": [
             "You are waiting in a slow morning line at an artisanal espresso bar where the barista is meticulously hand-pouring every order.",
             "You are browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
@@ -61,7 +68,7 @@ SCENARIO_POOLS = {
         ]
     },
     "Level 2: The Gallery Mixer (Neutral Ground)": {
-        "instructions": "Keep replies under 2 short sentences. Reward playful assumptions, challenge boring clichés, match the user's banter.",
+        "instructions": "Keep replies under 2 sentences. Reward playful assumptions, challenge boring clichés, match the user's banter.",
         "settings": [
             "You are standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a glass of sparkling water.",
             "You are browsing rare vintage vinyl records at a local weekend pop-up fair.",
@@ -79,7 +86,7 @@ SCENARIO_POOLS = {
         ]
     },
     "Level 3: The Dinner Party / Mutual Friends (Warm Social Dynamics)": {
-        "instructions": "Respond well to funny observations about the food/host, playful assumptions, and lively banter. Max 2 short sentences.",
+        "instructions": "Respond well to funny observations about the food/host, playful assumptions about how people know each other, and lively storytelling. Max 2 short sentences.",
         "settings": [
             "You are a close friend of the host sitting across the table at an intimate eight-person suburban dinner party.",
             "You are hanging around the kitchen island at a friend's housewarming party helping open wine bottles.",
@@ -179,8 +186,8 @@ if "transcript" not in st.session_state:
     st.session_state.transcript = []
 if "reaction_times" not in st.session_state:
     st.session_state.reaction_times = []
-if "partner_finished_time" not in st.session_state:
-    st.session_state.partner_finished_time = None
+if "active_timer_start" not in st.session_state:
+    st.session_state.active_timer_start = None
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
 
@@ -190,7 +197,7 @@ pairs_count = len(st.session_state.transcript) // 2
 top_col1, top_col2 = st.columns([3, 1])
 with top_col1:
     st.title("⚡ Charisma & Banter Lab")
-    st.caption("Real-time conversational sparring with instant stopwatch scoring.")
+    st.caption("Sub-second conversational sparring with precision latency tracking.")
 with top_col2:
     st.write("")
     if st.button("🔄 Reset Scenario", use_container_width=True):
@@ -198,7 +205,7 @@ with top_col2:
         st.session_state.reaction_times = []
         st.session_state.evaluation = None
         st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
-        st.session_state.partner_finished_time = None
+        st.session_state.active_timer_start = None
         st.rerun()
 
 # Level Selection
@@ -209,7 +216,7 @@ if selected_level != st.session_state.level:
     st.session_state.transcript = []
     st.session_state.reaction_times = []
     st.session_state.evaluation = None
-    st.session_state.partner_finished_time = None
+    st.session_state.active_timer_start = None
     st.rerun()
 
 st.info(f"📍 **Setting:** {st.session_state.current_setting}")
@@ -244,19 +251,21 @@ if pairs_count < 4:
             send_btn = st.form_submit_button("Send Line ⚡", use_container_width=True)
 
     user_line = None
-    measured_latency = None
+    calculated_latency = None
 
     # Precise Stopwatch Capture
     if send_btn and typed_message:
-        if st.session_state.partner_finished_time is not None:
-            measured_latency = max(0.5, round(time.time() - st.session_state.partner_finished_time, 1))
+        now = time.time()
+        if pairs_count > 0 and st.session_state.active_timer_start is not None:
+            calculated_latency = max(0.5, round(now - st.session_state.active_timer_start, 1))
         user_line = typed_message.strip()
     elif audio_record and "bytes" in audio_record and audio_record["bytes"]:
-        if st.session_state.partner_finished_time is not None:
-            measured_latency = max(0.5, round(time.time() - st.session_state.partner_finished_time, 1))
+        now = time.time()
+        if pairs_count > 0 and st.session_state.active_timer_start is not None:
+            calculated_latency = max(0.5, round(now - st.session_state.active_timer_start, 1))
         with st.spinner("⚡ Transcribing..."):
             try:
-                user_line = fast_generate([
+                user_line = fast_call([
                     types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
                     "Transcribe spoken English accurately. Output ONLY transcription text."
                 ])
@@ -265,11 +274,11 @@ if pairs_count < 4:
 
     # Fast Generation
     if user_line:
-        if measured_latency is not None:
-            st.session_state.reaction_times.append(measured_latency)
+        if calculated_latency is not None:
+            st.session_state.reaction_times.append(calculated_latency)
             
         temp_history = list(st.session_state.transcript)
-        temp_history.append({"role": "user", "text": user_line, "latency": measured_latency})
+        temp_history.append({"role": "user", "text": user_line, "latency": calculated_latency})
         
         dialogue_str = "\n".join([f"{t['role'].upper()}: {t['text']}" for t in temp_history])
         persona_prompt = f"""
@@ -279,18 +288,18 @@ if pairs_count < 4:
         Dialogue History:
         {dialogue_str}
 
-        Respond strictly in character. Keep it under 2 punchy sentences.
+        Respond strictly in character as the other person. Keep it under 2 punchy, natural sentences.
         """
         
         try:
-            partner_reply = fast_generate(persona_prompt)
+            partner_reply = fast_call(persona_prompt)
             
             # Append turns to state
-            st.session_state.transcript.append({"role": "user", "text": user_line, "latency": measured_latency})
+            st.session_state.transcript.append({"role": "user", "text": user_line, "latency": calculated_latency})
             st.session_state.transcript.append({"role": "assistant", "text": partner_reply})
             
-            # Start stopwatch the instant the partner reply is recorded
-            st.session_state.partner_finished_time = time.time()
+            # Start timer strictly when partner reply completes
+            st.session_state.active_timer_start = time.time()
             st.rerun()
         except Exception as e:
             st.error(f"Partner Response Error: {str(e)}")
@@ -348,7 +357,7 @@ else:
                 }}
                 """
                 try:
-                    eval_raw = fast_generate(critic_prompt, is_json=True)
+                    eval_raw = fast_call(critic_prompt, is_json=True)
                     clean_json = eval_raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
                     st.session_state.evaluation = json.loads(clean_json)
                     st.rerun()
@@ -388,5 +397,5 @@ else:
             st.session_state.reaction_times = []
             st.session_state.evaluation = None
             st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
-            st.session_state.partner_finished_time = None
+            st.session_state.active_timer_start = None
             st.rerun()
