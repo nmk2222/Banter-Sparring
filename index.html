@@ -371,7 +371,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Header-Based API Invocation
+    // Direct Gemini 3.6 Flash Dispatcher
     async function executeModelCall(prompt, isJson = false, systemInstructionText = "") {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -381,13 +381,13 @@
       }
       const apiKey = rawKey.trim();
 
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
       
       const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          maxOutputTokens: isJson ? 800 : 120,
-          temperature: isJson ? 0.1 : 0.8,
+          maxOutputTokens: isJson ? 800 : 150,
+          temperature: isJson ? 0.1 : 0.75,
           responseMimeType: isJson ? "application/json" : "text/plain"
         }
       };
@@ -419,8 +419,6 @@
       }
 
       let clean = rawText.trim();
-      
-      // Clean accidental Option headers, bullets, or wrapping quotes
       clean = clean.replace(/^(Option\s*\d+:?\s*\*?|\*|\"|Partner:\s*)+/gi, "");
       clean = clean.replace(/(\"|\*)+$/g, "").trim();
 
@@ -498,7 +496,7 @@
       const pool = SCENARIOS[currentTier];
       const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'You'}: ${t.text}`).join("\n");
       
-      const sysInstruction = `You are a real person engaging in natural, witty, casual conversation in real life.
+      const sysInstruction = `You are roleplaying as a real person in a casual conversation.
 Location Setting: ${currentSetting}
 Behavioral Style: ${pool.instructions}
 RULES:
