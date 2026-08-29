@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Charisma & Banter Lab</title>
+  <title>Charisma & Banter Lab v3.6</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
@@ -16,7 +19,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Sub-second Latency Tracking</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Powered by Gemini 3.6 Flash</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -166,6 +169,7 @@
   </div>
 
   <script>
+    // 7 TIERS x 20 UNIQUE SCENARIOS (140 SCENARIOS TOTAL)
     const SCENARIOS = {
       level1: {
         instructions: "Respond in 1 punchy, natural, grounded sentence (max 15 words). Match casual low-stakes banter.",
@@ -351,7 +355,7 @@
     let reactionTimes = [];
     let partnerCompletedTime = null;
 
-    // 1. API Key Drawer Logic
+    // 1. API Key Setup
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
     if (savedKey) {
       document.getElementById("apiKeyInput").value = savedKey;
@@ -375,7 +379,7 @@
       }
     };
 
-    // 2. Persistent Scoring History
+    // 2. Scorecard History
     function loadHistoricalStats() {
       const history = JSON.parse(localStorage.getItem("BANTER_SCORE_HISTORY") || "[]");
       if (!history.length) return;
@@ -406,7 +410,7 @@
       loadHistoricalStats();
     }
 
-    // 3. Explicit Model Invocation
+    // 3. Guaranteed Gemini 3.6 Flash Endpoint Execution
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
