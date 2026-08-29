@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Charisma & Banter Lab | Real-Time Sparring</title>
+  <title>Charisma & Banter Lab | Real-Time Voice Sparring</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
   
   <div class="max-w-2xl w-full flex flex-col gap-5">
     
-    <!-- Header -->
+    <!-- Top Header -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-4">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-1">High-speed conversational sparring with stopwatch latency scoring</p>
+        <p class="text-xs text-slate-400 mt-1">Real-time sparring with voice dictation & latency scoring</p>
       </div>
       <div id="statusBadge" class="text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
         Ready
@@ -24,19 +24,19 @@
     </div>
 
     <!-- API Key Section -->
-    <div id="apiKeySection" class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex flex-col gap-2">
+    <div id="apiKeySection" class="bg-slate-900/90 p-4 rounded-xl border border-slate-800 flex flex-col gap-2">
       <div class="flex items-center justify-between">
         <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local browser storage</span>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local storage</span>
       </div>
       <div class="flex gap-2">
         <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
-        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save</button>
+        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
       </div>
     </div>
 
-    <!-- Scenario Selector -->
-    <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
+    <!-- Scenario Selector & Setting -->
+    <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <label class="text-xs font-semibold text-slate-300">Training Scenario Tier:</label>
         <select id="scenarioSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
@@ -52,47 +52,47 @@
 
       <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 flex items-start gap-2 text-xs">
         <span class="text-sky-400">📍</span>
-        <div id="settingText" class="text-slate-300 italic">Select tier and click Start Drill.</div>
+        <div id="settingText" class="text-slate-300 italic">Select tier to generate a live environment.</div>
       </div>
     </div>
 
-    <!-- Interactive Sparring Arena -->
-    <div class="bg-slate-800/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
+    <!-- Interactive Dialogue Arena -->
+    <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Click Start</span></div>
-        <div>Reaction Pace: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
+        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Opener</span></div>
+        <div>Last Reaction: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
       </div>
 
-      <!-- Dialogue History -->
-      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[160px] max-h-72 overflow-y-auto" id="transcriptBox">
+      <!-- Dialogue History Stream -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[180px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
-          <div class="italic text-slate-600 text-center py-6">Click "🚀 Start Drill" to begin the round.</div>
+          <div class="italic text-slate-600 text-center py-6">Tap the red mic or type your line below to open the conversation...</div>
         </div>
       </div>
 
-      <!-- Input Controls -->
-      <div id="activeControls" class="flex flex-col gap-2">
-        <div class="flex gap-2">
-          <button id="micBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5">
-            <span id="micIcon">🎙️</span> <span id="micText">Mic</span>
-          </button>
-          <input type="text" id="userInput" placeholder="Deliver your observation line..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off" disabled>
-          <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1" disabled>
-            <span>Send</span> ⚡
-          </button>
-        </div>
+      <!-- Controls: Mic + Text + Send -->
+      <div class="flex items-center gap-2">
+        <button id="micBtn" class="bg-rose-600/90 hover:bg-rose-500 text-white font-semibold px-4 py-3 rounded-xl text-sm transition flex items-center gap-2 shadow-lg">
+          <span id="micIcon">🔴</span> <span id="micText">Record Mic</span>
+        </button>
+
+        <input type="text" id="userInput" placeholder="Or type your banter observation..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        
+        <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg">
+          <span>Send</span> ⚡
+        </button>
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <button id="startDrillBtn" class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-1.5 rounded-lg transition">🚀 Start Drill</button>
+        <span>Click 'Record Mic' to speak, or press Enter on typed line.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Setting</button>
       </div>
     </div>
 
     <!-- Scorecard Section -->
-    <div id="scorecardSection" class="bg-slate-800 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+    <div id="scorecardSection" class="bg-slate-900 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-sky-400 flex items-center gap-2">
           📊 Charisma & Timing Scorecard
         </h2>
@@ -101,39 +101,41 @@
         </span>
       </div>
 
+      <!-- Score Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
           <div id="spontaneityScore" class="text-xl font-bold text-sky-400 mt-1">--</div>
         </div>
-        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Independence</div>
           <div id="independenceScore" class="text-xl font-bold text-indigo-400 mt-1">--</div>
         </div>
-        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Playfulness</div>
           <div id="playfulnessScore" class="text-xl font-bold text-emerald-400 mt-1">--</div>
         </div>
-        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Brevity</div>
           <div id="brevityScore" class="text-xl font-bold text-amber-400 mt-1">--</div>
         </div>
-        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 col-span-2 sm:col-span-1">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 col-span-2 sm:col-span-1">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Overall</div>
           <div id="overallScore" class="text-xl font-bold text-rose-400 mt-1">--</div>
         </div>
       </div>
 
+      <!-- Coaching Analysis -->
       <div class="flex flex-col gap-3 text-xs">
-        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+        <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
           <div id="speedCritique" class="text-slate-300">--</div>
         </div>
-        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+        <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-emerald-300 mb-1">🚀 Upgraded Line Alternative:</div>
           <div id="lineUpgrade" class="text-slate-300 italic">--</div>
         </div>
-        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
+        <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-amber-300 mb-1">💡 Key Anchor for Next Round:</div>
           <div id="keyAnchor" class="text-slate-300 font-semibold">--</div>
         </div>
@@ -325,6 +327,11 @@
       }
     };
 
+    const ACTIVE_MODELS = [
+      "gemini-3.6-flash",
+      "gemini-3.1-pro-preview"
+    ];
+
     let currentTier = "level1";
     let currentSetting = "";
     let exchangesCount = 0;
@@ -346,10 +353,11 @@
       if (k) {
         localStorage.setItem("GEMINI_API_KEY", k);
         document.getElementById("keySavedNotice").classList.remove("hidden");
+        alert("API Key saved successfully!");
       }
     };
 
-    // Browser Web Speech Engine
+    // Speech Recognition
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
@@ -370,7 +378,7 @@
 
     function toggleMic(forceState) {
       if (!recognition) {
-        alert("Voice recognition is not supported in this browser. Please use Chrome or type your response.");
+        alert("Microphone recognition is not supported in this browser. Please use Chrome or type your line.");
         return;
       }
       isListening = forceState !== undefined ? forceState : !isListening;
@@ -381,7 +389,7 @@
       if (isListening) {
         try {
           recognition.start();
-          btn.className = "bg-rose-600 text-white px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5 animate-pulse";
+          btn.className = "bg-rose-600 text-white font-bold px-4 py-3 rounded-xl text-sm transition flex items-center gap-2 shadow-lg animate-pulse";
           icon.textContent = "⏹️";
           text.textContent = "Listening...";
         } catch (e) {
@@ -389,33 +397,34 @@
         }
       } else {
         try { recognition.stop(); } catch(e){}
-        btn.className = "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5";
-        icon.textContent = "🎙️";
-        text.textContent = "Mic";
+        btn.className = "bg-rose-600/90 hover:bg-rose-500 text-white font-semibold px-4 py-3 rounded-xl text-sm transition flex items-center gap-2 shadow-lg";
+        icon.textContent = "🔴";
+        text.textContent = "Record Mic";
       }
     }
 
     document.getElementById("micBtn").onclick = () => toggleMic();
 
-    function startNewDrill() {
+    function selectRandomSetting() {
       currentTier = document.getElementById("scenarioSelect").value;
       const pool = SCENARIOS[currentTier];
       currentSetting = pool.settings[Math.floor(Math.random() * pool.settings.length)];
       document.getElementById("settingText").textContent = currentSetting;
+      resetDrillState();
+    }
 
+    function resetDrillState() {
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
       partnerCompletedTime = null;
       document.getElementById("turnCounter").textContent = "Opener";
       document.getElementById("reactionDisplay").textContent = "--";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-4">Drill active! Speak or type your line opener below...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-6">Tap the red mic or type your line below to open the conversation...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
-      
-      const inputEl = document.getElementById("userInput");
-      inputEl.disabled = false;
+      document.getElementById("userInput").disabled = false;
       document.getElementById("sendBtn").disabled = false;
-      inputEl.focus();
+      document.getElementById("micBtn").disabled = false;
     }
 
     function appendMessage(role, text, latency = null) {
@@ -446,27 +455,36 @@
         throw new Error("Missing API Key");
       }
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: isJson ? 800 : 50,
-          temperature: isJson ? 0.2 : 0.7,
-          responseMimeType: isJson ? "application/json" : "text/plain"
-        }
-      };
+      let lastError = null;
+      for (const model of ACTIVE_MODELS) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: isJson ? 800 : 50,
+            temperature: isJson ? 0.2 : 0.7,
+            responseMimeType: isJson ? "application/json" : "text/plain"
+          }
+        };
 
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data.error?.message || "API Error");
+        try {
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          
+          const data = await resp.json();
+          if (resp.ok && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+            return data.candidates[0].content.parts[0].text.trim();
+          } else {
+            lastError = data.error?.message || `HTTP ${resp.status}`;
+          }
+        } catch (e) {
+          lastError = e.message;
+        }
       }
-      return data.candidates[0].content.parts[0].text.trim();
+      throw new Error(lastError || "All endpoints failed.");
     }
 
     async function handleUserSubmit() {
@@ -514,11 +532,12 @@
           document.getElementById("turnCounter").textContent = "Completed";
           inputEl.disabled = true;
           document.getElementById("sendBtn").disabled = true;
+          document.getElementById("micBtn").disabled = true;
           generateScorecard();
         }
       } catch (err) {
         console.error(err);
-        appendMessage("assistant", "[Error generating reply. Please check API Key.]");
+        appendMessage("assistant", `[Error: ${err.message}]`);
       }
     }
 
@@ -579,10 +598,9 @@
     }
 
     // Event Listeners
-    document.getElementById("startDrillBtn").onclick = startNewDrill;
-    document.getElementById("resetScenarioBtn").onclick = startNewDrill;
-    document.getElementById("nextDrillBtn").onclick = startNewDrill;
-    document.getElementById("scenarioSelect").onchange = startNewDrill;
+    document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
+    document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
+    document.getElementById("scenarioSelect").onchange = selectRandomSetting;
 
     document.getElementById("sendBtn").onclick = handleUserSubmit;
     document.getElementById("userInput").onkeydown = (e) => {
@@ -590,7 +608,7 @@
     };
 
     // Auto-init on page load
-    startNewDrill();
+    selectRandomSetting();
   </script>
 </body>
 </html>
