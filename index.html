@@ -30,7 +30,7 @@
         <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local storage</span>
       </div>
       <div class="flex gap-2">
-        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
+        <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
         <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
       </div>
     </div>
@@ -101,7 +101,6 @@
         </span>
       </div>
 
-      <!-- Score Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -125,7 +124,6 @@
         </div>
       </div>
 
-      <!-- Coaching Analysis -->
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
@@ -327,11 +325,6 @@
       }
     };
 
-    const ACTIVE_MODELS = [
-      "gemini-3.6-flash",
-      "gemini-3.1-pro-preview"
-    ];
-
     let currentTier = "level1";
     let currentSetting = "";
     let exchangesCount = 0;
@@ -449,15 +442,18 @@
     }
 
     async function callGemini(prompt, isJson = false) {
-      const apiKey = localStorage.getItem("GEMINI_API_KEY");
-      if (!apiKey) {
+      const rawKey = localStorage.getItem("GEMINI_API_KEY");
+      if (!rawKey) {
         alert("Please enter and save your Gemini API Key first.");
         throw new Error("Missing API Key");
       }
+      const apiKey = rawKey.trim();
 
+      const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview"];
       let lastError = null;
-      for (const model of ACTIVE_MODELS) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      for (const model of candidateModels) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -467,10 +463,18 @@
           }
         };
 
+        const headers = {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        };
+        if (apiKey.startsWith("AQ.")) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+
         try {
           const resp = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: headers,
             body: JSON.stringify(payload)
           });
           
@@ -484,7 +488,7 @@
           lastError = e.message;
         }
       }
-      throw new Error(lastError || "All endpoints failed.");
+      throw new Error(lastError || "Request failed.");
     }
 
     async function handleUserSubmit() {
@@ -512,10 +516,10 @@
       Rules: ${pool.instructions}
 
       Dialogue History:
-      ${dialogueStr}
+      {dialogueStr}
 
       Respond strictly in character as the other person. Keep it under 2 punchy sentences.
-      `;
+      `.replace("{dialogueStr}", dialogueStr);
 
       try {
         const partnerReply = await callGemini(personaPrompt);
