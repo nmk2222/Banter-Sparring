@@ -7,13 +7,18 @@ import random
 
 st.set_page_config(page_title="Charisma & Banter Lab", layout="centered")
 
+# Production Model Constant
+MODEL_NAME = "gemini-2.0-flash"
+
 # Initialize Gemini Client
 api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
     st.error("API Key missing. Please add GEMINI_API_KEY in Streamlit App Settings -> Secrets.")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+# Strip any accidental quotation marks or whitespace from secrets
+clean_key = str(api_key).strip().strip('"').strip("'")
+client = genai.Client(api_key=clean_key)
 
 # 12-14 Sub-Scenarios per Progressive Level
 SCENARIO_POOLS = {
@@ -178,8 +183,6 @@ for turn in st.session_state.transcript:
     else:
         with st.chat_message("assistant"):
             st.write(turn["text"])
-            if "audio" in turn and turn["audio"]:
-                st.audio(turn["audio"], format="audio/mp3")
 
 # Turn Handling (Max 4 turns per drill)
 if st.session_state.turn_count < 4:
@@ -191,25 +194,30 @@ if st.session_state.turn_count < 4:
         audio_record = mic_recorder(
             start_prompt="🔴 Record Line",
             stop_prompt="⏹️ Send Line",
-            key="mic_recorder",
+            key=f"mic_recorder_{st.session_state.turn_count}",
             format="webm"
         )
     with col2:
-        text_input = st.text_input("Or type line if mic is unavailable:", key="text_fallback")
+        with st.form(key=f"text_form_{st.session_state.turn_count}", clear_on_submit=True):
+            typed_text = st.text_input("Or type line and press Enter:")
+            submitted = st.form_submit_button("Send Typed Line")
 
     user_text = ""
     if audio_record and "bytes" in audio_record:
         with st.spinner("Listening..."):
-            transcribe_resp = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[
-                    types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
-                    "Transcribe the spoken English accurately. Output ONLY the transcription text without commentary."
-                ]
-            )
-            user_text = transcribe_resp.text.strip()
-    elif text_input and st.button("Send Typed Line"):
-        user_text = text_input.strip()
+            try:
+                transcribe_resp = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=[
+                        types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
+                        "Transcribe the spoken English accurately. Output ONLY the transcription text without commentary."
+                    ]
+                )
+                user_text = transcribe_resp.text.strip()
+            except Exception as e:
+                st.error(f"Transcription error: {str(e)}")
+    elif submitted and typed_text:
+        user_text = typed_text.strip()
 
     if user_text:
         st.session_state.transcript.append({"role": "user", "text": user_text})
@@ -225,36 +233,18 @@ if st.session_state.turn_count < 4:
             Dialogue History:
             {dialogue_history}
 
-            Respond in character as the other person.
+            Respond strictly in character as the other person.
             """
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=persona_prompt
-            )
-            partner_reply = response.text.strip()
-
-            # Text to Speech using Gemini Audio output
-            audio_bytes = None
             try:
-                tts_resp = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=f"Read this line aloud naturally with subtle vocal expression: {partner_reply}",
-                    config=types.GenerateContentConfig(
-                        response_mime_type="audio/mp3"
-                    )
+                response = client.models.generate_content(
+                    model=MODEL_NAME,
+                    contents=persona_prompt
                 )
-                if tts_resp.candidates and tts_resp.candidates[0].content.parts:
-                    for part in tts_resp.candidates[0].content.parts:
-                        if hasattr(part, 'inline_data') and part.inline_data:
-                            audio_bytes = part.inline_data.data
-            except Exception:
-                audio_bytes = None
-
-            turn_data = {"role": "assistant", "text": partner_reply}
-            if audio_bytes:
-                turn_data["audio"] = audio_bytes
+                partner_reply = response.text.strip()
+                st.session_state.transcript.append({"role": "assistant", "text": partner_reply})
+            except Exception as e:
+                st.error(f"Model error: {str(e)}")
             
-            st.session_state.transcript.append(turn_data)
             st.rerun()
 
 else:
@@ -299,12 +289,15 @@ else:
                   "key_takeaway": "string"
                 }}
                 """
-                eval_resp = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=critic_prompt,
-                    config=types.GenerateContentConfig(response_mime_type="application/json")
-                )
-                st.session_state.evaluation = json.loads(eval_resp.text)
+                try:
+                    eval_resp = client.models.generate_content(
+                        model=MODEL_NAME,
+                        contents=critic_prompt,
+                        config=types.GenerateContentConfig(response_mime_type="application/json")
+                    )
+                    st.session_state.evaluation = json.loads(eval_resp.text)
+                except Exception as e:
+                    st.error(f"Scoring error: {str(e)}")
                 st.rerun()
 
     if st.session_state.evaluation:
