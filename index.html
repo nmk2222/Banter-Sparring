@@ -19,7 +19,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Sub-second Latency Tracking</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Auto-Discovered Engine</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -31,12 +31,13 @@
     <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all">
       <div class="flex items-center justify-between">
         <label class="text-xs font-semibold text-slate-300">Google AI Studio API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Active and saved</span>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Connected (<span id="activeModelLabel">auto</span>)</span>
       </div>
       <div class="flex gap-2">
         <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
-        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
+        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save & Test</button>
       </div>
+      <div id="keyErrorNotice" class="text-xs text-rose-400 hidden"></div>
     </div>
 
     <!-- Lifetime Stats History -->
@@ -354,32 +355,81 @@
     let transcriptLog = [];
     let reactionTimes = [];
     let partnerCompletedTime = null;
+    let verifiedModel = localStorage.getItem("GEMINI_VERIFIED_MODEL") || "";
 
-    // 1. API Key Drawer Setup
+    // 1. Dynamic Model Discovery Engine
+    async function discoverAndVerifyModel(apiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      
+      if (!resp.ok || !data.models) {
+        throw new Error(data.error?.message || `Failed to authenticate (HTTP ${resp.status})`);
+      }
+
+      // Find best available model supporting generateContent
+      const supported = data.models.filter(m => 
+        m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent")
+      );
+
+      if (!supported.length) {
+        throw new Error("No text generation models available for this API key.");
+      }
+
+      // Prioritize flash models, then any available generateContent model
+      const preferred = supported.find(m => m.name.includes("flash") && !m.name.includes("preview"))
+                     || supported.find(m => m.name.includes("flash"))
+                     || supported[0];
+
+      const cleanModelName = preferred.name.replace(/^models\//, "");
+      localStorage.setItem("GEMINI_VERIFIED_MODEL", cleanModelName);
+      verifiedModel = cleanModelName;
+      return cleanModelName;
+    }
+
+    // 2. API Key Drawer Setup & Verification
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
     if (savedKey) {
       document.getElementById("apiKeyInput").value = savedKey;
-      document.getElementById("apiKeySection").classList.add("hidden");
-      document.getElementById("keyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400";
-      document.getElementById("keyStatusText").textContent = "⚙️ Key Active";
+      if (verifiedModel) {
+        document.getElementById("activeModelLabel").textContent = verifiedModel;
+        document.getElementById("keySavedNotice").classList.remove("hidden");
+        document.getElementById("apiKeySection").classList.add("hidden");
+        document.getElementById("keyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400";
+        document.getElementById("keyStatusText").textContent = `⚙️ ${verifiedModel}`;
+      }
     }
 
     document.getElementById("toggleKeyBtn").onclick = () => {
       document.getElementById("apiKeySection").classList.toggle("hidden");
     };
 
-    document.getElementById("saveKeyBtn").onclick = () => {
+    document.getElementById("saveKeyBtn").onclick = async () => {
       const k = document.getElementById("apiKeyInput").value.trim();
-      if (k) {
+      const errBox = document.getElementById("keyErrorNotice");
+      errBox.classList.add("hidden");
+      
+      if (!k) return;
+
+      try {
+        document.getElementById("saveKeyBtn").textContent = "Verifying...";
+        const activeM = await discoverAndVerifyModel(k);
         localStorage.setItem("GEMINI_API_KEY", k);
+        
+        document.getElementById("activeModelLabel").textContent = activeM;
         document.getElementById("keySavedNotice").classList.remove("hidden");
         document.getElementById("keyStatusDot").className = "w-2 h-2 rounded-full bg-emerald-400";
-        document.getElementById("keyStatusText").textContent = "⚙️ Key Active";
+        document.getElementById("keyStatusText").textContent = `⚙️ ${activeM}`;
+        document.getElementById("saveKeyBtn").textContent = "Save & Test";
         setTimeout(() => document.getElementById("apiKeySection").classList.add("hidden"), 500);
+      } catch (err) {
+        document.getElementById("saveKeyBtn").textContent = "Save & Test";
+        errBox.textContent = `Verification Error: ${err.message}`;
+        errBox.classList.remove("hidden");
       }
     };
 
-    // 2. Lifetime Score Tracker
+    // 3. Lifetime Score Tracker
     function loadHistoricalStats() {
       const history = JSON.parse(localStorage.getItem("BANTER_SCORE_HISTORY") || "[]");
       if (!history.length) return;
@@ -410,7 +460,7 @@
       loadHistoricalStats();
     }
 
-    // 3. Robust Dispatcher with Clean String Processing
+    // 4. Reliable API Call Dispatcher
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -420,66 +470,54 @@
       }
       const apiKey = rawKey.trim();
 
-      const endpoints = ["gemini-2.0-flash", "gemini-1.5-flash"];
-      let lastError = null;
+      if (!verifiedModel) {
+        verifiedModel = await discoverAndVerifyModel(apiKey);
+      }
 
-      for (const model of endpoints) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const payload = {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: isJson ? 800 : 150,
-            temperature: isJson ? 0.1 : 0.75,
-            responseMimeType: isJson ? "application/json" : "text/plain"
-          }
-        };
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${verifiedModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: isJson ? 800 : 150,
+          temperature: isJson ? 0.1 : 0.75,
+          responseMimeType: isJson ? "application/json" : "text/plain"
+        }
+      };
 
-        try {
-          const resp = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-          const data = await resp.json();
+      const data = await resp.json();
 
-          if (!resp.ok) {
-            lastError = data.error?.message || `HTTP ${resp.status}`;
-            continue;
-          }
+      if (!resp.ok) {
+        throw new Error(data.error?.message || `HTTP ${resp.status}`);
+      }
 
-          if (data && Array.isArray(data.candidates) && data.candidates.length > 0) {
-            const candidate = data.candidates[0];
-            if (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
-              const text = candidate.content.parts[0].text;
-              if (text && typeof text === 'string') {
-                // Strip stray wrapping quotes if returned
-                let clean = text.trim();
-                if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 1) {
-                  clean = clean.substring(1, clean.length - 1).trim();
-                }
-                if (clean.length > 0) {
-                  return clean;
-                }
-              }
+      if (data && Array.isArray(data.candidates) && data.candidates.length > 0) {
+        const candidate = data.candidates[0];
+        if (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
+          const text = candidate.content.parts[0].text;
+          if (text && typeof text === 'string') {
+            let clean = text.trim();
+            if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 1) {
+              clean = clean.substring(1, clean.length - 1).trim();
             }
+            if (clean.length > 0) return clean;
           }
-
-          if (data && data.promptFeedback && data.promptFeedback.blockReason) {
-            lastError = `Content Filter: ${data.promptFeedback.blockReason}`;
-            continue;
-          }
-
-          lastError = "Empty candidate response structure";
-        } catch (e) {
-          lastError = e.message;
         }
       }
 
-      throw new Error(lastError || "All endpoints failed.");
+      if (data && data.promptFeedback && data.promptFeedback.blockReason) {
+        throw new Error(`Content Filtered: ${data.promptFeedback.blockReason}`);
+      }
+
+      throw new Error("Empty candidate response received.");
     }
 
-    // 4. State Machine
+    // 5. Drill Execution State Machine
     function selectRandomSetting() {
       currentTier = document.getElementById("scenarioSelect").value;
       const pool = SCENARIOS[currentTier];
@@ -548,7 +586,7 @@
       transcriptLog.push({ role: "user", text, latency: measuredLatency });
 
       const pool = SCENARIOS[currentTier];
-      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'Partner'}: ${t.text}`).join("\n");
+      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'Partner'}: "${t.text}"`).join("\n");
       
       const personaPrompt = `
 You are roleplaying as a real person in a casual conversation.
