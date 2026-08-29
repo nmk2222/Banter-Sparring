@@ -170,7 +170,7 @@
 
   <script>
     const SCENARIOS = {
-      level1: { instructions: "Respond in 1 natural conversational sentence. Match casual low-stakes banter.", settings: [
+      level1: { instructions: "Respond in 1-2 natural, complete conversational sentences. Match casual low-stakes banter.", settings: [
         "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every single order.",
         "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
         "Standing in a long line at a popular Sunday morning bagel bakery watching the chaotic kitchen staff.",
@@ -236,7 +236,7 @@
         "Sitting on a cozy living room sectional during an informal post-dinner game night.",
         "Helping uncork magnum bottles at an anniversary celebration dinner."
       ]},
-      level4: { instructions: "Keep replies ultra-brief and punchy (1 sentence, max 12 words). Match high concert energy.", settings: [
+      level4: { instructions: "Keep replies punchy and complete in 1 sentence. Match high concert energy.", settings: [
         "Standing near the soundboard between sets at a crowded indoor indie rock venue.",
         "Waiting in a slow beverage line on the lawn at an outdoor summer amphitheater festival.",
         "Leaning against the balcony railing at an electronic dance music venue between artist sets.",
@@ -258,7 +258,7 @@
         "Resting on the turf at an all-day funk and soul festival listening to a brass band.",
         "Waiting in the coat check queue at 1 AM after a high-energy dance show."
       ]},
-      level5: { instructions: "Respond in 1 grounded sentence. Appreciate dry self-amused commiseration; reject try-hard lines.", settings: [
+      level5: { instructions: "Respond in 1-2 grounded sentences. Appreciate dry self-amused commiseration; reject try-hard lines.", settings: [
         "Wiping down a barbell station after completing a brutal conditioning circuit class.",
         "Refilling a water bottle near the turf sprinting area between heavy sled pushes.",
         "Rolling out your back on a foam roller in the gym mobility corner after a tough session.",
@@ -280,7 +280,7 @@
         "Sitting on a balance ball cooling down after a high-intensity interval session.",
         "Wiping sweat off your brow near the pull-up bars at an outdoor beach workout park."
       ]},
-      level6: { instructions: "Respond with witty, flirtatious frame control in 1-2 punchy sentences.", settings: [
+      level6: { instructions: "Respond with witty, flirtatious frame control in 1-2 complete sentences.", settings: [
         "Waiting for the bartender at a crowded speakeasy cocktail lounge on a Friday night.",
         "Sitting on a plush leather sofa at an upscale hotel bar enjoying an Old Fashioned.",
         "Leaning on the railing of a crowded rooftop bar enjoying a summer sunset drink.",
@@ -302,7 +302,7 @@
         "Sharing a communal high-top bench at a trendy craft cider and beer garden.",
         "Enjoying an aperitivo spritz at a stylish open-air Italian plaza lounge."
       ]},
-      level7: { instructions: "Start dry and skeptical in 1 sentence. Only warm up if user shows genuine humor.", settings: [
+      level7: { instructions: "Start dry and skeptical in 1-2 complete sentences. Only warm up if user shows genuine humor.", settings: [
         "Sitting at an airport departure gate on a three-hour flight delay reading a dense novel.",
         "Sitting alone with a laptop in a quiet hotel lobby bar catching up on work emails.",
         "Waiting for a delayed commuter train on a freezing winter evening platform.",
@@ -379,8 +379,8 @@
       loadHistoricalStats();
     }
 
-    // Direct Gemini 3.6 Flash Dispatcher
-    async function executeModelCall(prompt, isJson = false) {
+    // Direct Gemini 3.6 Flash Dispatcher Supporting Native Multi-Turn Contents
+    async function executeModelCall(contentsArray, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
         document.getElementById("apiKeySection").classList.remove("hidden");
@@ -392,9 +392,9 @@
       const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
       
       const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: contentsArray,
         generationConfig: {
-          maxOutputTokens: 600,
+          maxOutputTokens: 2048,
           temperature: isJson ? 0.1 : 0.75,
           responseMimeType: isJson ? "application/json" : "text/plain"
         }
@@ -500,24 +500,33 @@
       transcriptLog.push({ role: "user", text, latency: measuredLatency });
 
       const pool = SCENARIOS[currentTier];
-      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'You'}: ${t.text}`).join("\n");
       
-      const personaPrompt = `You are roleplaying as a real person engaging in natural, witty, casual conversation in real life.
+      // Construct native Gemini multi-turn messages array
+      const systemInstructionPreamble = `System Context: You are roleplaying as a real person engaging in authentic, witty, casual conversation in real life.
 Location Setting: ${currentSetting}
 Behavioral Style: ${pool.instructions}
-
 RULES:
 1. Speak in 1-2 complete, authentic conversational sentences.
-2. Complete your thought fully.
-3. Output ONLY your direct spoken line.
+2. Complete every thought fully with proper punctuation.
+3. Output ONLY your direct spoken line without meta-commentary or quotation marks.`;
 
-Conversation History:
-${dialogueStr}
+      const contentsPayload = [
+        {
+          role: "user",
+          parts: [{ text: `${systemInstructionPreamble}\n\nStart conversation: "${transcriptLog[0].text}"` }]
+        }
+      ];
 
-Respond to the last line from 'Me':`;
+      for (let i = 1; i < transcriptLog.length; i++) {
+        const item = transcriptLog[i];
+        contentsPayload.push({
+          role: item.role === "user" ? "user" : "model",
+          parts: [{ text: item.text }]
+        });
+      }
 
       try {
-        const partnerReply = await executeModelCall(personaPrompt, false);
+        const partnerReply = await executeModelCall(contentsPayload, false);
         appendMessage("assistant", partnerReply);
         transcriptLog.push({ role: "assistant", text: partnerReply });
         
@@ -564,7 +573,7 @@ Evaluate User based on:
 4. Brevity (1-10)
 5. Warmth (1-10)
 
-Return ONLY valid JSON with no markdown wrapping:
+Return ONLY valid JSON:
 {
   "spontaneity": 9,
   "independence": 8,
@@ -578,13 +587,10 @@ Return ONLY valid JSON with no markdown wrapping:
 }`;
 
       try {
-        const rawResponse = await executeModelCall(criticPrompt, true);
-        
-        // Robust JSON Extraction (handles any residual markdown ticks or text prefix)
+        const rawResponse = await executeModelCall([{ role: "user", parts: [{ text: criticPrompt }] }], true);
         const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error("Unable to parse scorecard JSON format");
-        }
+        if (!jsonMatch) throw new Error("Unable to parse scorecard JSON format");
+        
         const score = JSON.parse(jsonMatch[0]);
 
         document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 8}/10`;
@@ -603,7 +609,6 @@ Return ONLY valid JSON with no markdown wrapping:
       } catch (e) {
         console.error("Scorecard generation error:", e);
         document.getElementById("scorecardLoading").classList.add("hidden");
-        // Fallback display in case of network anomaly
         document.getElementById("spontaneityScore").textContent = "8/10";
         document.getElementById("independenceScore").textContent = "8/10";
         document.getElementById("playfulnessScore").textContent = "8/10";
