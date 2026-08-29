@@ -3,48 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Charisma & Banter Lab | Real-Time Live Sparring</title>
+  <title>Charisma & Banter Lab | Real-Time Sparring</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .pulse-ring {
-      animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    @keyframes pulse-border {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.08); }
-    }
-  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
   
   <div class="max-w-2xl w-full flex flex-col gap-5">
     
-    <!-- Top Header -->
+    <!-- Header -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-4">
       <div>
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-1">Real-time sparring with latency tracking and charisma scoring</p>
+        <p class="text-xs text-slate-400 mt-1">High-speed conversational sparring with stopwatch latency scoring</p>
       </div>
-      <div id="statusBadge" class="text-xs px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+      <div id="statusBadge" class="text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
         Ready
       </div>
     </div>
 
-    <!-- API Key Section (Stored locally in your browser only) -->
+    <!-- API Key Section -->
     <div id="apiKeySection" class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex flex-col gap-2">
       <div class="flex items-center justify-between">
         <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local storage</span>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved in local browser storage</span>
       </div>
       <div class="flex gap-2">
         <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
-        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
+        <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save</button>
       </div>
     </div>
 
-    <!-- Scenario Selector & Setting -->
+    <!-- Scenario Selector -->
     <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <label class="text-xs font-semibold text-slate-300">Training Scenario Tier:</label>
@@ -61,35 +52,40 @@
 
       <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-800 flex items-start gap-2 text-xs">
         <span class="text-sky-400">📍</span>
-        <div id="settingText" class="text-slate-300 italic">Click Start Drill to generate a randomized environment.</div>
+        <div id="settingText" class="text-slate-300 italic">Select tier and click Start Drill.</div>
       </div>
     </div>
 
-    <!-- Interactive Dialogue Arena -->
+    <!-- Interactive Sparring Arena -->
     <div class="bg-slate-800/40 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Opener</span></div>
-        <div>Last Reaction: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
+        <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Click Start</span></div>
+        <div>Reaction Pace: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
       </div>
 
-      <!-- Dialogue History Stream -->
+      <!-- Dialogue History -->
       <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[160px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
-          <div class="italic text-slate-600 text-center py-6">Select your scenario above and enter your line below...</div>
+          <div class="italic text-slate-600 text-center py-6">Click "🚀 Start Drill" to begin the round.</div>
         </div>
       </div>
 
-      <!-- Input Bar -->
-      <div class="flex gap-2">
-        <input type="text" id="userInput" placeholder="Deliver your observation line..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
-        <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1">
-          <span>Send</span> ⚡
-        </button>
+      <!-- Input Controls -->
+      <div id="activeControls" class="flex flex-col gap-2">
+        <div class="flex gap-2">
+          <button id="micBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5">
+            <span id="micIcon">🎙️</span> <span id="micText">Mic</span>
+          </button>
+          <input type="text" id="userInput" placeholder="Deliver your observation line..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off" disabled>
+          <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1" disabled>
+            <span>Send</span> ⚡
+          </button>
+        </div>
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>Press Enter or click Send to fire your reply.</span>
+        <button id="startDrillBtn" class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-1.5 rounded-lg transition">🚀 Start Drill</button>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Setting</button>
       </div>
     </div>
@@ -105,7 +101,6 @@
         </span>
       </div>
 
-      <!-- Score Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -129,7 +124,6 @@
         </div>
       </div>
 
-      <!-- Coaching Analysis -->
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
@@ -153,7 +147,6 @@
   </div>
 
   <script>
-    // 20 Settings per Level
     const SCENARIOS = {
       level1: {
         instructions: "Keep replies strictly under 1-2 punchy sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
@@ -338,8 +331,10 @@
     let transcriptLog = [];
     let reactionTimes = [];
     let partnerCompletedTime = null;
+    let recognition = null;
+    let isListening = false;
 
-    // Load API Key from local browser storage
+    // Load API Key
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
     if (savedKey) {
       document.getElementById("apiKeyInput").value = savedKey;
@@ -354,29 +349,80 @@
       }
     };
 
-    function selectRandomSetting() {
+    // Browser Web Speech Engine
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const spokenText = event.results[0][0].transcript;
+        document.getElementById("userInput").value = spokenText;
+        toggleMic(false);
+        handleUserSubmit();
+      };
+
+      recognition.onerror = () => toggleMic(false);
+      recognition.onend = () => toggleMic(false);
+    }
+
+    function toggleMic(forceState) {
+      if (!recognition) {
+        alert("Voice recognition is not supported in this browser. Please use Chrome or type your response.");
+        return;
+      }
+      isListening = forceState !== undefined ? forceState : !isListening;
+      const btn = document.getElementById("micBtn");
+      const icon = document.getElementById("micIcon");
+      const text = document.getElementById("micText");
+
+      if (isListening) {
+        try {
+          recognition.start();
+          btn.className = "bg-rose-600 text-white px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5 animate-pulse";
+          icon.textContent = "⏹️";
+          text.textContent = "Listening...";
+        } catch (e) {
+          isListening = false;
+        }
+      } else {
+        try { recognition.stop(); } catch(e){}
+        btn.className = "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-1.5";
+        icon.textContent = "🎙️";
+        text.textContent = "Mic";
+      }
+    }
+
+    document.getElementById("micBtn").onclick = () => toggleMic();
+
+    function startNewDrill() {
       currentTier = document.getElementById("scenarioSelect").value;
       const pool = SCENARIOS[currentTier];
       currentSetting = pool.settings[Math.floor(Math.random() * pool.settings.length)];
       document.getElementById("settingText").textContent = currentSetting;
-      resetDrillState();
-    }
 
-    function resetDrillState() {
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
       partnerCompletedTime = null;
       document.getElementById("turnCounter").textContent = "Opener";
       document.getElementById("reactionDisplay").textContent = "--";
-      document.getElementById("transcriptFeed").innerHTML = "";
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-4">Drill active! Speak or type your line opener below...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
-      document.getElementById("userInput").disabled = false;
+      
+      const inputEl = document.getElementById("userInput");
+      inputEl.disabled = false;
       document.getElementById("sendBtn").disabled = false;
+      inputEl.focus();
     }
 
     function appendMessage(role, text, latency = null) {
       const feed = document.getElementById("transcriptFeed");
+      if (feed.children.length === 1 && feed.children[0].classList.contains("italic")) {
+        feed.innerHTML = "";
+      }
       const msg = document.createElement("div");
       msg.className = `p-2.5 rounded-xl text-xs max-w-[85%] ${
         role === 'user' 
@@ -441,7 +487,6 @@
       appendMessage("user", text, measuredLatency);
       transcriptLog.push({ role: "user", text, latency: measuredLatency });
 
-      // Build Prompt
       const pool = SCENARIOS[currentTier];
       const dialogueStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
       const personaPrompt = `
@@ -451,7 +496,7 @@
       Dialogue History:
       ${dialogueStr}
 
-      Respond strictly in character as the other person. Keep it under 2 punchy, natural sentences.
+      Respond strictly in character as the other person. Keep it under 2 punchy sentences.
       `;
 
       try {
@@ -464,6 +509,7 @@
 
         if (exchangesCount < 4) {
           document.getElementById("turnCounter").textContent = `Exchange ${exchangesCount + 1} of 4`;
+          inputEl.focus();
         } else {
           document.getElementById("turnCounter").textContent = "Completed";
           inputEl.disabled = true;
@@ -472,7 +518,7 @@
         }
       } catch (err) {
         console.error(err);
-        appendMessage("assistant", "[Error generating reply. Please check your API key.]");
+        appendMessage("assistant", "[Error generating reply. Please check API Key.]");
       }
     }
 
@@ -533,17 +579,18 @@
     }
 
     // Event Listeners
-    document.getElementById("scenarioSelect").onchange = selectRandomSetting;
-    document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
-    document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
+    document.getElementById("startDrillBtn").onclick = startNewDrill;
+    document.getElementById("resetScenarioBtn").onclick = startNewDrill;
+    document.getElementById("nextDrillBtn").onclick = startNewDrill;
+    document.getElementById("scenarioSelect").onchange = startNewDrill;
 
     document.getElementById("sendBtn").onclick = handleUserSubmit;
     document.getElementById("userInput").onkeydown = (e) => {
       if (e.key === "Enter") handleUserSubmit();
     };
 
-    // Initial Load
-    selectRandomSetting();
+    // Auto-init on page load
+    startNewDrill();
   </script>
 </body>
 </html>
