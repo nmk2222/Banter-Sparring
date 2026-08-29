@@ -5,7 +5,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Charisma & Banter Lab</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col items-center p-4 sm:p-6">
   
@@ -110,7 +110,7 @@
 
     <!-- Loading Indicator for Scorecard -->
     <div id="scorecardLoading" class="bg-slate-900/80 p-5 rounded-2xl border border-sky-500/30 flex items-center justify-center gap-3 text-xs text-sky-300 hidden">
-      <svg class="animate-spin h-4 w-4 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-4 w-4 text-sky-400" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
       </svg>
@@ -151,15 +151,15 @@
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
-          <div id="speedCritique" class="text-slate-300">--</div>
+          <div id="speedCritique" class="text-slate-300 leading-relaxed">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-emerald-300 mb-1">🚀 Upgraded Alternative Line:</div>
-          <div id="lineUpgrade" class="text-slate-300 italic">--</div>
+          <div id="lineUpgrade" class="text-slate-300 italic leading-relaxed">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-amber-300 mb-1">💡 Key Anchor for Next Round:</div>
-          <div id="keyAnchor" class="text-slate-300 font-semibold">--</div>
+          <div id="keyAnchor" class="text-slate-300 font-semibold leading-relaxed">--</div>
         </div>
       </div>
 
@@ -379,7 +379,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Gemini 3.6 Flash Dispatcher Supporting Native Multi-Turn Contents
+    // Direct Gemini 3.6 Flash Dispatcher Supporting Strict Response Modes
     async function executeModelCall(contentsArray, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -389,13 +389,13 @@
       }
       const apiKey = rawKey.trim();
 
-      const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
+      const url = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent)";
       
       const payload = {
         contents: contentsArray,
         generationConfig: {
           maxOutputTokens: 2048,
-          temperature: isJson ? 0.1 : 0.75,
+          temperature: isJson ? 0.2 : 0.75,
           responseMimeType: isJson ? "application/json" : "text/plain"
         }
       };
@@ -406,235 +406,3 @@
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey
         },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        throw new Error(data.error?.message || `HTTP ${resp.status}`);
-      }
-
-      const candidate = data?.candidates?.[0];
-      const parts = candidate?.content?.parts || [];
-      const fullText = parts.map(p => p.text || '').join('');
-
-      if (!fullText.trim()) {
-        throw new Error("Empty response received.");
-      }
-
-      let clean = fullText.trim();
-      clean = clean.replace(/^(Option\s*\d+:?\s*\*?|\*|\"|Partner:\s*)+/gi, "");
-      clean = clean.replace(/(\"|\*)+$/g, "").trim();
-
-      return clean;
-    }
-
-    // State Machine
-    function selectRandomSetting() {
-      currentTier = document.getElementById("scenarioSelect").value;
-      const pool = SCENARIOS[currentTier];
-      currentSetting = pool.settings[Math.floor(Math.random() * pool.settings.length)];
-      document.getElementById("settingText").textContent = currentSetting;
-      resetDrillState();
-    }
-
-    function resetDrillState() {
-      exchangesCount = 0;
-      transcriptLog = [];
-      reactionTimes = [];
-      partnerCompletedTime = null;
-      document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
-      document.getElementById("reactionDisplay").textContent = "--";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>';
-      document.getElementById("scorecardSection").classList.add("hidden");
-      document.getElementById("scorecardLoading").classList.add("hidden");
-      
-      const inputEl = document.getElementById("userInput");
-      inputEl.disabled = false;
-      inputEl.value = "";
-      document.getElementById("sendBtn").disabled = false;
-      inputEl.focus();
-    }
-
-    function appendMessage(role, text, latency = null) {
-      const feed = document.getElementById("transcriptFeed");
-      if (feed.children.length === 1 && feed.children[0].classList.contains("italic")) {
-        feed.innerHTML = "";
-      }
-      const msg = document.createElement("div");
-      msg.className = `p-2.5 rounded-xl text-xs max-w-[85%] ${
-        role === 'user' 
-          ? 'bg-sky-950/80 border border-sky-800 text-sky-200 self-end ml-auto' 
-          : 'bg-slate-900 border border-slate-800 text-slate-200 self-start mr-auto'
-      }`;
-      
-      const tag = role === 'user' 
-        ? (latency !== null ? `You (⚡ ${latency}s):` : 'You (Opener):')
-        : 'Partner:';
-        
-      msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
-      feed.appendChild(msg);
-      document.getElementById("transcriptBox").scrollTop = document.getElementById("transcriptBox").scrollHeight;
-    }
-
-    async function handleUserSubmit() {
-      const inputEl = document.getElementById("userInput");
-      const text = inputEl.value.trim();
-      if (!text) return;
-
-      const now = performance.now();
-      let measuredLatency = null;
-
-      if (exchangesCount > 0 && partnerCompletedTime !== null) {
-        measuredLatency = parseFloat(((now - partnerCompletedTime) / 1000).toFixed(1));
-        reactionTimes.push(measuredLatency);
-        document.getElementById("reactionDisplay").textContent = `${measuredLatency}s`;
-      }
-
-      inputEl.value = "";
-      inputEl.disabled = true;
-      document.getElementById("sendBtn").disabled = true;
-
-      appendMessage("user", text, measuredLatency);
-      transcriptLog.push({ role: "user", text, latency: measuredLatency });
-
-      const pool = SCENARIOS[currentTier];
-      
-      // Construct native Gemini multi-turn messages array
-      const systemInstructionPreamble = `System Context: You are roleplaying as a real person engaging in authentic, witty, casual conversation in real life.
-Location Setting: ${currentSetting}
-Behavioral Style: ${pool.instructions}
-RULES:
-1. Speak in 1-2 complete, authentic conversational sentences.
-2. Complete every thought fully with proper punctuation.
-3. Output ONLY your direct spoken line without meta-commentary or quotation marks.`;
-
-      const contentsPayload = [
-        {
-          role: "user",
-          parts: [{ text: `${systemInstructionPreamble}\n\nStart conversation: "${transcriptLog[0].text}"` }]
-        }
-      ];
-
-      for (let i = 1; i < transcriptLog.length; i++) {
-        const item = transcriptLog[i];
-        contentsPayload.push({
-          role: item.role === "user" ? "user" : "model",
-          parts: [{ text: item.text }]
-        });
-      }
-
-      try {
-        const partnerReply = await executeModelCall(contentsPayload, false);
-        appendMessage("assistant", partnerReply);
-        transcriptLog.push({ role: "assistant", text: partnerReply });
-        
-        partnerCompletedTime = performance.now();
-        exchangesCount++;
-
-        if (exchangesCount < 4) {
-          document.getElementById("turnCounter").textContent = `Turn ${exchangesCount + 1} of 4`;
-          inputEl.disabled = false;
-          document.getElementById("sendBtn").disabled = false;
-          inputEl.focus();
-        } else {
-          document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
-          document.getElementById("scorecardLoading").classList.remove("hidden");
-          generateScorecard();
-        }
-      } catch (err) {
-        console.error(err);
-        appendMessage("assistant", `[Error: ${err.message}]`);
-        inputEl.disabled = false;
-        document.getElementById("sendBtn").disabled = false;
-      }
-    }
-
-    async function generateScorecard() {
-      const avgLatency = reactionTimes.length 
-        ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
-        : "2.5";
-
-      const transcriptStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
-      
-      const criticPrompt = `You are a conversational charisma coach.
-Analyze this banter transcript:
-Setting: ${currentSetting}
-Avg Reaction Latency: ${avgLatency}s
-
-Transcript:
-${transcriptStr}
-
-Evaluate User based on:
-1. Spontaneity (1-10)
-2. Independence (1-10)
-3. Playfulness & Frame Control (1-10)
-4. Brevity (1-10)
-5. Warmth (1-10)
-
-Return ONLY valid JSON:
-{
-  "spontaneity": 9,
-  "independence": 8,
-  "playfulness": 7,
-  "brevity": 9,
-  "overall": 8.2,
-  "verdict": "Passed",
-  "speed_critique": "Solid timing and tempo.",
-  "upgraded_line": "Stronger alternative phrasing.",
-  "key_anchor": "Core dynamic to practice."
-}`;
-
-      try {
-        const rawResponse = await executeModelCall([{ role: "user", parts: [{ text: criticPrompt }] }], true);
-        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("Unable to parse scorecard JSON format");
-        
-        const score = JSON.parse(jsonMatch[0]);
-
-        document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 8}/10`;
-        document.getElementById("independenceScore").textContent = `${score.independence || 8}/10`;
-        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 8}/10`;
-        document.getElementById("brevityScore").textContent = `${score.brevity || 8}/10`;
-        document.getElementById("overallScore").textContent = `${score.overall || 8.0}/10`;
-        document.getElementById("scoreVerdict").textContent = score.verdict || "Passed";
-        document.getElementById("speedCritique").textContent = score.speed_critique || "Great response speed.";
-        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || score.upgrade || 'Nice delivery.'}"`;
-        document.getElementById("keyAnchor").textContent = score.key_anchor || "Keep strong frame control.";
-
-        document.getElementById("scorecardLoading").classList.add("hidden");
-        document.getElementById("scorecardSection").classList.remove("hidden");
-        recordDrillScore(score, avgLatency);
-      } catch (e) {
-        console.error("Scorecard generation error:", e);
-        document.getElementById("scorecardLoading").classList.add("hidden");
-        document.getElementById("spontaneityScore").textContent = "8/10";
-        document.getElementById("independenceScore").textContent = "8/10";
-        document.getElementById("playfulnessScore").textContent = "8/10";
-        document.getElementById("brevityScore").textContent = "8/10";
-        document.getElementById("overallScore").textContent = "8.0/10";
-        document.getElementById("scoreVerdict").textContent = "Completed";
-        document.getElementById("speedCritique").textContent = `Average response speed: ${avgLatency}s`;
-        document.getElementById("lineUpgrade").textContent = '"Keep the momentum and lean into playful assumptions."';
-        document.getElementById("keyAnchor").textContent = "Spontaneity and brevity";
-        document.getElementById("scorecardSection").classList.remove("hidden");
-      }
-    }
-
-    // Event Listeners
-    document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
-    document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
-    document.getElementById("scenarioSelect").onchange = selectRandomSetting;
-
-    document.getElementById("sendBtn").onclick = handleUserSubmit;
-    document.getElementById("userInput").onkeydown = (e) => {
-      if (e.key === "Enter") handleUserSubmit();
-    };
-
-    // Auto-init
-    loadHistoricalStats();
-    selectRandomSetting();
-  </script>
-</body>
-</html>
