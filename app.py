@@ -16,10 +16,9 @@ if not api_key:
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-# Production Models
 MODEL_NAME = "gemini-2.0-flash"
 
-# Scenario Library
+# Scenarios Library
 SCENARIO_POOLS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
         "instructions": "Keep replies strictly under 2 sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
@@ -149,59 +148,75 @@ SCENARIO_POOLS = {
     }
 }
 
-# State Management
+# State Management Initialization
 if "level" not in st.session_state:
     st.session_state.level = list(SCENARIO_POOLS.keys())[0]
 if "current_setting" not in st.session_state:
     st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
 if "transcript" not in st.session_state:
     st.session_state.transcript = []
-if "turn_count" not in st.session_state:
-    st.session_state.turn_count = 0
 if "evaluation" not in st.session_state:
     st.session_state.evaluation = None
 
-st.title("🎙️ Charisma & Banter Lab")
-st.caption("Dynamic conversational sparring with randomized settings and charisma scoring.")
+# Auto-heal state: Calculate completed exchanges strictly from paired turns
+pairs_count = len(st.session_state.transcript) // 2
 
+# Top Header Layout
+top_col1, top_col2 = st.columns([3, 1])
+with top_col1:
+    st.title("🎙️ Charisma & Banter Lab")
+    st.caption("Dynamic conversational sparring with charisma scorecard.")
+with top_col2:
+    st.write("")
+    if st.button("🔄 Reset Scenario", use_container_width=True):
+        st.session_state.transcript = []
+        st.session_state.evaluation = None
+        st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
+        st.rerun()
+
+# Scenario Selection
 selected_level = st.selectbox("Select Training Scenario Tier:", list(SCENARIO_POOLS.keys()))
 if selected_level != st.session_state.level:
     st.session_state.level = selected_level
     st.session_state.current_setting = random.choice(SCENARIO_POOLS[selected_level]["settings"])
     st.session_state.transcript = []
-    st.session_state.turn_count = 0
     st.session_state.evaluation = None
     st.rerun()
 
 st.info(f"📍 **Setting:** {st.session_state.current_setting}")
 
-# Display Dialogue History
+# Display Dialogue Stream
 for turn in st.session_state.transcript:
     if turn["role"] == "user":
         st.chat_message("user").write(turn["text"])
     else:
         st.chat_message("assistant").write(turn["text"])
 
-# Process New Turn
-user_line = None
-
-if st.session_state.turn_count < 4:
+# Interaction Zone (Max 4 full exchanges)
+if pairs_count < 4:
     st.write("---")
-    st.write(f"**Your Turn (Exchange {st.session_state.turn_count + 1} of 4):**")
+    st.write(f"**Your Turn (Exchange {pairs_count + 1} of 4):**")
     
-    # Audio Recording Widget
-    audio_record = mic_recorder(
-        start_prompt="🔴 Record Line with Mic",
-        stop_prompt="⏹️ Send Audio Line",
-        key=f"mic_rec_{st.session_state.turn_count}",
-        format="webm"
-    )
+    # Input options side-by-side
+    col_mic, col_text = st.columns([1, 2])
     
-    # Text Input Bar (Hit Enter to send)
-    text_input = st.chat_input("Or type your banter line and hit Enter...")
+    with col_mic:
+        audio_record = mic_recorder(
+            start_prompt="🔴 Record Mic",
+            stop_prompt="⏹️ Send Audio",
+            key=f"mic_rec_{pairs_count}",
+            format="webm"
+        )
+        
+    with col_text:
+        with st.form(key=f"text_input_form_{pairs_count}", clear_on_submit=True):
+            typed_message = st.text_input("Type your banter line here:", placeholder="Deliver your observation...")
+            send_btn = st.form_submit_button("Send Line", use_container_width=True)
+
+    user_line = None
 
     if audio_record and "bytes" in audio_record and audio_record["bytes"]:
-        with st.spinner("Transcribing your audio..."):
+        with st.spinner("Transcribing your voice..."):
             try:
                 transcribe_resp = client.models.generate_content(
                     model=MODEL_NAME,
@@ -213,13 +228,12 @@ if st.session_state.turn_count < 4:
                 user_line = transcribe_resp.text.strip()
             except Exception as e:
                 st.error(f"Audio Transcription Error: {str(e)}")
-    elif text_input:
-        user_line = text_input.strip()
+    elif send_btn and typed_message:
+        user_line = typed_message.strip()
 
-    # Generate Response if User Line Present
+    # Generate Response
     if user_line:
-        with st.spinner("Sparring partner is thinking..."):
-            # Build current history + prospective user line
+        with st.spinner("Sparring partner responding..."):
             temp_history = list(st.session_state.transcript)
             temp_history.append({"role": "user", "text": user_line})
             
@@ -240,10 +254,9 @@ if st.session_state.turn_count < 4:
                 )
                 partner_reply = response.text.strip()
                 
-                # Append both lines to state upon success
+                # Append both lines to state
                 st.session_state.transcript.append({"role": "user", "text": user_line})
                 st.session_state.transcript.append({"role": "assistant", "text": partner_reply})
-                st.session_state.turn_count += 1
                 st.rerun()
             except Exception as e:
                 st.error(f"API Generation Error: {str(e)}")
@@ -253,7 +266,7 @@ else:
     st.success("🎉 Drill Complete (4 Exchanges Finished)!")
     
     if st.session_state.evaluation is None:
-        if st.button("📊 Generate Charisma Scorecard"):
+        if st.button("📊 Generate Charisma Scorecard", use_container_width=True):
             with st.spinner("Analyzing banter dynamics..."):
                 transcript_block = "\n".join([f"{t['role'].upper()}: {t['text']}" for t in st.session_state.transcript])
                 critic_prompt = f"""
@@ -325,9 +338,8 @@ else:
         
         st.info(f"**Anchor for next round:** {ev.get('key_takeaway', '')}")
 
-        if st.button("🔄 Start New Drill"):
+        if st.button("🔄 Start New Drill", use_container_width=True):
             st.session_state.transcript = []
-            st.session_state.turn_count = 0
             st.session_state.evaluation = None
             st.session_state.current_setting = random.choice(SCENARIO_POOLS[st.session_state.level]["settings"])
             st.rerun()
