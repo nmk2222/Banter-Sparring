@@ -149,7 +149,7 @@
   <script>
     const SCENARIOS = {
       level1: {
-        instructions: "Keep replies strictly under 1-2 punchy sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
+        instructions: "Keep replies to 1-2 natural, punchy sentences. React with realistic warmth, situational humor, and grounded banter. Stay in character.",
         settings: [
           "Waiting in a slow morning line at an artisanal espresso bar where the barista is hand-pouring every order.",
           "Browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
@@ -174,7 +174,7 @@
         ]
       },
       level2: {
-        instructions: "Keep replies under 2 sentences. Reward playful assumptions, challenge boring clichés, match the user's banter.",
+        instructions: "Keep replies under 2 sentences. Reward playful assumptions, challenge clichés, match the user's banter.",
         settings: [
           "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a glass of sparkling water.",
           "Browsing rare vintage vinyl records at a local weekend pop-up fair.",
@@ -457,8 +457,8 @@
         const payload = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: isJson ? 800 : 50,
-            temperature: isJson ? 0.2 : 0.7,
+            maxOutputTokens: isJson ? 800 : 150,
+            temperature: isJson ? 0.2 : 0.75,
             responseMimeType: isJson ? "application/json" : "text/plain"
           }
         };
@@ -510,16 +510,18 @@
       transcriptLog.push({ role: "user", text, latency: measuredLatency });
 
       const pool = SCENARIOS[currentTier];
-      const dialogueStr = transcriptLog.map(t => `${t.role.toUpperCase()}: ${t.text}`).join("\n");
+      const dialogueStr = transcriptLog.map(t => `${t.role === 'user' ? 'Me' : 'You'}: "${t.text}"`).join("\n");
+      
       const personaPrompt = `
-      Scenario: ${currentSetting}
-      Rules: ${pool.instructions}
+You are roleplaying as a real person in a casual conversation.
+Setting: ${currentSetting}
+Behavior Guidelines: ${pool.instructions}
 
-      Dialogue History:
-      {dialogueStr}
+Conversation so far:
+${dialogueStr}
 
-      Respond strictly in character as the other person. Keep it under 2 punchy sentences.
-      `.replace("{dialogueStr}", dialogueStr);
+Reply naturally to the last line from 'Me' as 'You'. Speak in 1-2 realistic, conversational sentences. Do not include labels or quotes in your output.
+`;
 
       try {
         const partnerReply = await callGemini(personaPrompt);
