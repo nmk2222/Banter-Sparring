@@ -7,23 +7,22 @@ import random
 
 st.set_page_config(page_title="Charisma & Banter Lab", layout="centered")
 
-# Production Model Constant
-MODEL_NAME = "gemini-2.0-flash"
-
 # Initialize Gemini Client
 api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
     st.error("API Key missing. Please add GEMINI_API_KEY in Streamlit App Settings -> Secrets.")
     st.stop()
 
-# Strip any accidental quotation marks or whitespace from secrets
 clean_key = str(api_key).strip().strip('"').strip("'")
 client = genai.Client(api_key=clean_key)
 
-# 12-14 Sub-Scenarios per Progressive Level
+# Production Models
+MODEL_NAME = "gemini-2.0-flash"
+
+# Scenario Library
 SCENARIO_POOLS = {
     "Level 1: The Casual Line Opener (Low Stakes)": {
-        "instructions": "Keep replies under 2 sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
+        "instructions": "Keep replies strictly under 2 sentences. React naturally to observations and situational humor. Do not interrogate. Stay strictly in character.",
         "settings": [
             "You are waiting in a slow morning line at an artisanal espresso bar where the barista is meticulously hand-pouring every order.",
             "You are browsing the new release non-fiction table at an independent neighborhood bookstore on a rainy afternoon.",
@@ -150,7 +149,7 @@ SCENARIO_POOLS = {
     }
 }
 
-# State Management Initialization
+# State Management
 if "level" not in st.session_state:
     st.session_state.level = list(SCENARIO_POOLS.keys())[0]
 if "current_setting" not in st.session_state:
@@ -176,64 +175,63 @@ if selected_level != st.session_state.level:
 
 st.info(f"📍 **Setting:** {st.session_state.current_setting}")
 
-# Render Chat History
+# Display Dialogue History
 for turn in st.session_state.transcript:
     if turn["role"] == "user":
         st.chat_message("user").write(turn["text"])
     else:
-        with st.chat_message("assistant"):
-            st.write(turn["text"])
+        st.chat_message("assistant").write(turn["text"])
 
-# Turn Handling (Max 4 turns per drill)
+# Process New Turn
+user_line = None
+
 if st.session_state.turn_count < 4:
     st.write("---")
     st.write(f"**Your Turn (Exchange {st.session_state.turn_count + 1} of 4):**")
     
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        audio_record = mic_recorder(
-            start_prompt="🔴 Record Line",
-            stop_prompt="⏹️ Send Line",
-            key=f"mic_recorder_{st.session_state.turn_count}",
-            format="webm"
-        )
-    with col2:
-        with st.form(key=f"text_form_{st.session_state.turn_count}", clear_on_submit=True):
-            typed_text = st.text_input("Or type line and press Enter:")
-            submitted = st.form_submit_button("Send Typed Line")
+    # Audio Recording Widget
+    audio_record = mic_recorder(
+        start_prompt="🔴 Record Line with Mic",
+        stop_prompt="⏹️ Send Audio Line",
+        key=f"mic_rec_{st.session_state.turn_count}",
+        format="webm"
+    )
+    
+    # Text Input Bar (Hit Enter to send)
+    text_input = st.chat_input("Or type your banter line and hit Enter...")
 
-    user_text = ""
-    if audio_record and "bytes" in audio_record:
-        with st.spinner("Listening..."):
+    if audio_record and "bytes" in audio_record and audio_record["bytes"]:
+        with st.spinner("Transcribing your audio..."):
             try:
                 transcribe_resp = client.models.generate_content(
                     model=MODEL_NAME,
                     contents=[
                         types.Part.from_bytes(data=audio_record["bytes"], mime_type="audio/webm"),
-                        "Transcribe the spoken English accurately. Output ONLY the transcription text without commentary."
+                        "Transcribe the spoken English accurately. Output ONLY the raw transcription without commentary."
                     ]
                 )
-                user_text = transcribe_resp.text.strip()
+                user_line = transcribe_resp.text.strip()
             except Exception as e:
-                st.error(f"Transcription error: {str(e)}")
-    elif submitted and typed_text:
-        user_text = typed_text.strip()
+                st.error(f"Audio Transcription Error: {str(e)}")
+    elif text_input:
+        user_line = text_input.strip()
 
-    if user_text:
-        st.session_state.transcript.append({"role": "user", "text": user_text})
-        st.session_state.turn_count += 1
-
-        # Generate In-Character Response
-        with st.spinner("Responding..."):
-            dialogue_history = "\n".join([f"{t['role'].upper()}: {t['text']}" for t in st.session_state.transcript])
+    # Generate Response if User Line Present
+    if user_line:
+        with st.spinner("Sparring partner is thinking..."):
+            # Build current history + prospective user line
+            temp_history = list(st.session_state.transcript)
+            temp_history.append({"role": "user", "text": user_line})
+            
+            dialogue_str = "\n".join([f"{t['role'].upper()}: {t['text']}" for t in temp_history])
             persona_prompt = f"""
             Scenario Context: {st.session_state.current_setting}
             Behavioral Rules: {SCENARIO_POOLS[st.session_state.level]['instructions']}
 
             Dialogue History:
-            {dialogue_history}
+            {dialogue_str}
 
-            Respond strictly in character as the other person.
+            Respond strictly in character as the other person. Keep it punchy, conversational, and natural.
             """
             try:
                 response = client.models.generate_content(
@@ -241,11 +239,14 @@ if st.session_state.turn_count < 4:
                     contents=persona_prompt
                 )
                 partner_reply = response.text.strip()
+                
+                # Append both lines to state upon success
+                st.session_state.transcript.append({"role": "user", "text": user_line})
                 st.session_state.transcript.append({"role": "assistant", "text": partner_reply})
+                st.session_state.turn_count += 1
+                st.rerun()
             except Exception as e:
-                st.error(f"Model error: {str(e)}")
-            
-            st.rerun()
+                st.error(f"API Generation Error: {str(e)}")
 
 else:
     # Round Complete - Evaluation Section
@@ -296,9 +297,9 @@ else:
                         config=types.GenerateContentConfig(response_mime_type="application/json")
                     )
                     st.session_state.evaluation = json.loads(eval_resp.text)
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Scoring error: {str(e)}")
-                st.rerun()
+                    st.error(f"Scoring Error: {str(e)}")
 
     if st.session_state.evaluation:
         ev = st.session_state.evaluation
@@ -311,17 +312,18 @@ else:
         m4.metric("Warmth", f"{ev['scores']['warmth']}/10")
         
         st.write("### 💡 Strengths & Weaknesses")
-        for s in ev["strengths"]:
+        for s in ev.get("strengths", []):
             st.write(f"✅ {s}")
-        for w in ev["weaknesses"]:
+        for w in ev.get("weaknesses", []):
             st.write(f"⚠️ {w}")
             
-        st.write("### 🚀 Upgraded Line Alternative")
-        st.write(f"**Instead of:** *\"{ev['best_turn_upgrade']['original']}\"*")
-        st.write(f"**Try saying:** **\"{ev['best_turn_upgrade']['upgraded']}\"**")
-        st.caption(f"**Why:** {ev['best_turn_upgrade']['reason']}")
+        if "best_turn_upgrade" in ev and ev["best_turn_upgrade"]:
+            st.write("### 🚀 Upgraded Line Alternative")
+            st.write(f"**Instead of:** *\"{ev['best_turn_upgrade'].get('original', '')}\"*")
+            st.write(f"**Try saying:** **\"{ev['best_turn_upgrade'].get('upgraded', '')}\"**")
+            st.caption(f"**Why:** {ev['best_turn_upgrade'].get('reason', '')}")
         
-        st.info(f"**Anchor for next round:** {ev['key_takeaway']}")
+        st.info(f"**Anchor for next round:** {ev.get('key_takeaway', '')}")
 
         if st.button("🔄 Start New Drill"):
             st.session_state.transcript = []
