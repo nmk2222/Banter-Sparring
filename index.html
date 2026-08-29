@@ -13,15 +13,17 @@
   
   <div class="max-w-2xl w-full flex flex-col gap-4">
     
-    <!-- Header -->
+    <!-- Top Header -->
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <div>
-        <h1 class="text-2xl font-bold text-sky-400">⚡ Charisma & Banter Lab</h1>
+        <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
+          ⚡ Charisma & Banter Lab
+        </h1>
         <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Sub-second Latency Tracking</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-        <span id="keyStatusText">⚙️ Configure API Key</span>
+        <span id="keyStatusText">⚙️ Key Active</span>
       </button>
     </div>
 
@@ -29,15 +31,15 @@
     <div id="apiKeySection" class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2 transition-all">
       <div class="flex items-center justify-between">
         <label class="text-xs font-semibold text-slate-300">Gemini API Key:</label>
-        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Key Saved</span>
+        <span id="keySavedNotice" class="text-[11px] text-emerald-400 hidden">✓ Saved</span>
       </div>
       <div class="flex gap-2">
-        <input type="password" id="apiKeyInput" placeholder="Paste your key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
+        <input type="password" id="apiKeyInput" placeholder="Paste your API key here..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-sky-500">
         <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">Save Key</button>
       </div>
     </div>
 
-    <!-- Stats History -->
+    <!-- Lifetime Stats History -->
     <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 grid grid-cols-4 gap-2 text-center text-xs">
       <div>
         <div class="text-[10px] text-slate-500 uppercase tracking-wider">Drills Done</div>
@@ -57,7 +59,7 @@
       </div>
     </div>
 
-    <!-- Tier & Scenario -->
+    <!-- Tier & Scenario Selection -->
     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <label class="text-xs font-semibold text-slate-300">Select Difficulty Tier:</label>
@@ -86,14 +88,17 @@
         <div>Reaction Latency: <span id="reactionDisplay" class="font-bold text-amber-400">--</span></div>
       </div>
 
+      <!-- Dialogue History -->
       <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[200px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
           <div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>
         </div>
       </div>
 
+      <!-- Input Bar -->
       <div class="flex items-center gap-2">
         <input type="text" id="userInput" placeholder="Type your line here and press Enter..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        
         <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg shrink-0">
           <span>Send</span> ⚡
         </button>
@@ -105,13 +110,14 @@
       </div>
     </div>
 
-    <!-- Scorecard -->
+    <!-- Scorecard Section -->
     <div id="scorecardSection" class="bg-slate-900 p-6 rounded-2xl border border-sky-500/30 flex flex-col gap-5 hidden">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h2 class="text-lg font-bold text-sky-400">📊 Round Scorecard</h2>
         <span id="scoreVerdict" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Passed</span>
       </div>
 
+      <!-- Metrics Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
           <div class="text-[10px] uppercase tracking-wider text-slate-400">Spontaneity</div>
@@ -135,6 +141,7 @@
         </div>
       </div>
 
+      <!-- Coaching Analysis -->
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
           <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time Breakdown:</div>
@@ -179,7 +186,7 @@
         "Waiting near the customer service desk at an upscale department store.",
         "Sitting in the courtyard of an open-air shopping village holding shopping bags."
       ]},
-      level2: { instructions: "Respond in 1-2 punchy sentences. Challenge clichés, reward funny assumptions.", settings: [
+      level2: { instructions: "Respond in 1-2 punchy sentences. Challenge clichés, reward funny assumptions, maintain playful social flow.", settings: [
         "Standing in front of an abstract, confusing modern sculpture at a gallery opening, holding a sparkling water.",
         "Browsing rare vintage vinyl records at a local weekend pop-up fair.",
         "Browsing items at a silent charity auction while sipping champagne.",
@@ -366,7 +373,7 @@
       loadHistoricalStats();
     }
 
-    // Adaptive Authentication Dispatcher (Handles AQ. and AIza keys)
+    // Direct Gemini 3.6 Flash Invocation (Exact Supported Endpoint)
     async function executeModelCall(prompt, isJson = false) {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -376,66 +383,38 @@
       }
       const apiKey = rawKey.trim();
 
-      // For AQ. keys, use standard header-based auth.
-      // For AIza keys, use query param.
-      const isBearer = apiKey.startsWith("AQ.");
-      const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
-      let lastError = null;
-
-      for (const model of candidateModels) {
-        const url = isBearer
-          ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-          : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-        const headers = { "Content-Type": "application/json" };
-        if (isBearer) {
-          headers["Authorization"] = `Bearer ${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: isJson ? 800 : 250,
+          temperature: isJson ? 0.1 : 0.75,
+          responseMimeType: isJson ? "application/json" : "text/plain"
         }
+      };
 
-        const payload = {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: isJson ? 800 : 150,
-            temperature: isJson ? 0.1 : 0.75,
-            responseMimeType: isJson ? "application/json" : "text/plain"
-          }
-        };
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-        try {
-          const resp = await fetch(url, {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(payload)
-          });
+      const data = await resp.json();
 
-          const data = await resp.json();
-
-          if (!resp.ok) {
-            lastError = data.error?.message || `HTTP ${resp.status}`;
-            continue;
-          }
-
-          if (data && Array.isArray(data.candidates) && data.candidates.length > 0) {
-            const candidate = data.candidates[0];
-            if (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts.length > 0) {
-              const text = candidate.content.parts[0].text;
-              if (text && typeof text === 'string') {
-                let clean = text.trim();
-                if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 1) {
-                  clean = clean.substring(1, clean.length - 1).trim();
-                }
-                if (clean.length > 0) return clean;
-              }
-            }
-          }
-
-          lastError = "Empty response structure.";
-        } catch (e) {
-          lastError = e.message;
-        }
+      if (!resp.ok) {
+        throw new Error(data.error?.message || `HTTP ${resp.status}`);
       }
 
-      throw new Error(lastError || "All model endpoints failed.");
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        throw new Error("Empty response received from model endpoint.");
+      }
+
+      let clean = rawText.trim();
+      if (clean.startsWith('"') && clean.endsWith('"') && clean.length > 1) {
+        clean = clean.substring(1, clean.length - 1).trim();
+      }
+      return clean;
     }
 
     // State Machine
@@ -454,7 +433,7 @@
       partnerCompletedTime = null;
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
       document.getElementById("reactionDisplay").textContent = "--";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or banter line below and press Enter...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       
       const inputEl = document.getElementById("userInput");
@@ -519,7 +498,7 @@ ${dialogueStr}
 
 Instructions:
 Reply naturally to the last line from 'Me'. Speak in 1-2 realistic, witty conversational sentences. 
-Do not prefix your response with "Partner:" or "You:". Output only the direct dialogue words.
+Do not prefix your response with "Partner:" or "You:". Output only the direct dialogue words without surrounding quotes.
 `;
 
       try {
