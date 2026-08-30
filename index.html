@@ -17,7 +17,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Continuous Voice Dictation</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Reading-Buffered Stopwatch</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -97,7 +97,7 @@
       <div id="voiceActiveBar" class="bg-rose-950/80 border border-rose-600 text-rose-200 text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-between hidden">
         <span class="flex items-center gap-2 font-medium">
           <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-          Recording active... Click "Done Speaking" or press Send when finished.
+          Recording continuously... Click "Done Speaking" to stop & submit.
         </span>
         <button id="cancelVoiceBtn" class="text-[11px] text-rose-300 hover:text-white underline">Cancel</button>
       </div>
@@ -118,7 +118,7 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>🎙️ Continuous Recording: Click mic once to start, click again to stop & send.</span>
+        <span>⏱️ Reading Buffer: Visible countdown gives you full reading time before stopwatch starts.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -347,135 +347,155 @@
     let transcriptLog = [];
     let reactionTimes = [];
     let lastPartnerText = "";
-    let isVoiceModeActive = false;
-    let finalSpokenText = "";
     
-    // High-Precision Timing State
-    let turnStartTimestamp = null;
-    let liveTimerInterval = null;
+    // Voice State Flags
+    let isVoiceRecording = false;
+    let finalAccumulatedSpeech = "";
+    
+    // Explicit Reading Buffer & Stopwatch State
+    let turnEngageTimestamp = null;
+    let readingCountdownInterval = null;
+    let stopwatchInterval = null;
 
-    function startLiveStopwatch() {
-      stopLiveStopwatch();
-      turnStartTimestamp = performance.now();
+    function startReadingCountdownThenStopwatch(partnerText) {
+      clearAllTimers();
       const displayEl = document.getElementById("reactionDisplay");
       
-      liveTimerInterval = setInterval(() => {
-        if (!turnStartTimestamp) return;
-        const rawSeconds = (performance.now() - turnStartTimestamp) / 1000;
-        displayEl.textContent = `${rawSeconds.toFixed(1)}s elapsed`;
+      // Calculate reading allowance: slow-medium (160 wpm = 0.38s/word) + 2.5s base cognitive buffer
+      const wordCount = partnerText ? partnerText.trim().split(/\s+/).length : 0;
+      let remainingSeconds = Math.max(Math.ceil((wordCount * 0.38) + 2.5), 4);
+      
+      displayEl.className = "font-bold text-sky-400 font-mono";
+      displayEl.textContent = `📖 Reading: ${remainingSeconds}s...`;
+      
+      readingCountdownInterval = setInterval(() => {
+        remainingSeconds--;
+        if (remainingSeconds > 0) {
+          displayEl.textContent = `📖 Reading: ${remainingSeconds}s...`;
+        } else {
+          clearInterval(readingCountdownInterval);
+          readingCountdownInterval = null;
+          startReactionStopwatch();
+        }
+      }, 1000);
+    }
+
+    function startReactionStopwatch() {
+      const displayEl = document.getElementById("reactionDisplay");
+      turnEngageTimestamp = performance.now();
+      displayEl.className = "font-bold text-amber-400 font-mono";
+      
+      stopwatchInterval = setInterval(() => {
+        if (!turnEngageTimestamp) return;
+        const elapsed = ((performance.now() - turnEngageTimestamp) / 1000).toFixed(1);
+        displayEl.textContent = `⚡ ${elapsed}s (verbal pace)`;
       }, 100);
     }
 
-    function stopLiveStopwatch() {
-      if (liveTimerInterval) {
-        clearInterval(liveTimerInterval);
-        liveTimerInterval = null;
+    function clearAllTimers() {
+      if (readingCountdownInterval) {
+        clearInterval(readingCountdownInterval);
+        readingCountdownInterval = null;
+      }
+      if (stopwatchInterval) {
+        clearInterval(stopwatchInterval);
+        stopwatchInterval = null;
       }
     }
 
-    // Realistic Conversational Calculation
-    function calculateSpokenPace(rawSeconds, promptText, userText, wasSpoken) {
-      if (wasSpoken) {
-        return parseFloat(Math.max(rawSeconds - 0.5, 0.8).toFixed(1));
-      }
-
-      const readingWords = promptText ? promptText.trim().split(/\s+/).length : 0;
-      const readingAllowance = readingWords * 0.35 + 1.5;
-      
-      const typingWords = userText ? userText.trim().split(/\s+/).length : 0;
-      const typingAllowance = Math.max(typingWords * 1.1, 3.0);
-      
-      const effectiveSpokenTime = rawSeconds - readingAllowance - typingAllowance;
-      return parseFloat(Math.min(Math.max(effectiveSpokenTime, 0.9), 3.0).toFixed(1));
-    }
-
-    // Continuous Speech-to-Text Setup with Manual Toggle Control
+    // Continuous Speech-to-Text with Persistent Auto-Revival
     let recognition = null;
     const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (SpeechAPI) {
+    function initSpeechEngine() {
+      if (!SpeechAPI) return;
       recognition = new SpeechAPI();
-      recognition.continuous = true; // DO NOT stop on audio pauses
-      recognition.interimResults = true; // Stream words in real-time
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      recognition.onstart = () => {
-        isVoiceModeActive = true;
-        finalSpokenText = "";
-        document.getElementById("voiceActiveBar").classList.remove("hidden");
-        document.getElementById("micBtn").classList.add("bg-rose-600", "hover:bg-rose-500", "animate-pulse");
-        document.getElementById("micIcon").textContent = "⏹️";
-        document.getElementById("micLabel").textContent = "Done Speaking";
-      };
-
       recognition.onresult = (event) => {
-        let interimTranscript = "";
+        let interim = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalSpokenText += event.results[i][0].transcript + " ";
+            finalAccumulatedSpeech += event.results[i][0].transcript + " ";
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interim += event.results[i][0].transcript;
           }
         }
-        document.getElementById("userInput").value = (finalSpokenText + interimTranscript).trim();
+        document.getElementById("userInput").value = (finalAccumulatedSpeech + interim).trim();
       };
 
       recognition.onerror = (e) => {
-        if (e.error !== 'no-speech') {
-          console.warn("Speech recognition error:", e.error);
+        if (e.error === 'no-speech' && isVoiceRecording) {
+          try { recognition.start(); } catch(err){}
         }
       };
 
       recognition.onend = () => {
-        // If still flagged as active (e.g. system timeout), keep listening
-        if (isVoiceModeActive) {
+        if (isVoiceRecording) {
           try { recognition.start(); } catch(err){}
         }
       };
     }
 
-    function toggleVoiceMode() {
+    initSpeechEngine();
+
+    function toggleVoiceRecording() {
       if (!SpeechAPI) {
-        alert("Voice recognition requires Chrome, Edge, or Safari with microphone permissions enabled.");
+        alert("Voice input requires Chrome, Edge, or Safari with microphone permissions enabled.");
         return;
       }
-      
-      if (isVoiceModeActive) {
-        // Manual stop action -> finalize transcript & send line
-        isVoiceModeActive = false;
+
+      if (isVoiceRecording) {
+        isVoiceRecording = false;
         try { recognition.stop(); } catch(e){}
-        stopVoiceModeUI();
-        
+        stopVoiceUI();
+
         if (document.getElementById("userInput").value.trim().length > 0) {
           handleUserSubmit(true);
         }
       } else {
-        // Start recording
+        isVoiceRecording = true;
+        finalAccumulatedSpeech = "";
         document.getElementById("userInput").value = "";
-        try { recognition.start(); } catch(e){ recognition.stop(); }
+        
+        try { 
+          recognition.start(); 
+        } catch(e) {
+          try { recognition.stop(); recognition.start(); } catch(err){}
+        }
+        startVoiceUI();
       }
     }
 
-    function stopVoiceModeUI() {
+    function startVoiceUI() {
+      document.getElementById("voiceActiveBar").classList.remove("hidden");
+      document.getElementById("micBtn").classList.add("bg-rose-600", "hover:bg-rose-500", "animate-pulse");
+      document.getElementById("micIcon").textContent = "⏹️";
+      document.getElementById("micLabel").textContent = "Done Speaking";
+    }
+
+    function stopVoiceUI() {
       document.getElementById("voiceActiveBar").classList.add("hidden");
       document.getElementById("micBtn").classList.remove("bg-rose-600", "hover:bg-rose-500", "animate-pulse");
       document.getElementById("micIcon").textContent = "🎙️";
       document.getElementById("micLabel").textContent = "Speak";
     }
 
-    document.getElementById("micBtn").onclick = toggleVoiceMode;
+    document.getElementById("micBtn").onclick = toggleVoiceRecording;
     document.getElementById("cancelVoiceBtn").onclick = () => {
-      isVoiceModeActive = false;
-      if (recognition) recognition.stop();
-      stopVoiceModeUI();
+      isVoiceRecording = false;
+      try { recognition.stop(); } catch(e){}
+      stopVoiceUI();
       document.getElementById("userInput").value = "";
     };
 
-    // Keyboard shortcut (Ctrl+Space or Cmd+Space) to toggle voice dictation
+    // Keyboard shortcut (Ctrl+Space / Cmd+Space)
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.code === "Space") {
         e.preventDefault();
-        toggleVoiceMode();
+        toggleVoiceRecording();
       }
     });
 
@@ -590,18 +610,19 @@
     }
 
     function resetDrillState() {
-      stopLiveStopwatch();
-      isVoiceModeActive = false;
+      clearAllTimers();
+      isVoiceRecording = false;
       if (recognition) try { recognition.stop(); } catch(e){}
-      stopVoiceModeUI();
+      stopVoiceUI();
 
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
       lastPartnerText = "";
-      turnStartTimestamp = null;
+      turnEngageTimestamp = null;
       
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
+      document.getElementById("reactionDisplay").className = "font-bold text-amber-400 font-mono";
       document.getElementById("reactionDisplay").textContent = "Ready...";
       document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak to talk...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
@@ -627,7 +648,7 @@
       }`;
       
       const tag = role === 'user' 
-        ? (latency !== null ? `You (⚡ ${latency}s pace):` : 'You (Opener):')
+        ? (latency !== null ? `You (⚡ ${latency}s verbal pace):` : 'You (Opener):')
         : 'Partner:';
         
       msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
@@ -640,34 +661,36 @@
       const text = inputEl.value.trim();
       if (!text) return;
 
-      stopLiveStopwatch();
-      if (isVoiceModeActive) {
-        isVoiceModeActive = false;
-        if (recognition) try { recognition.stop(); } catch(e){}
+      clearAllTimers();
+      if (isVoiceRecording) {
+        isVoiceRecording = false;
+        try { recognition.stop(); } catch(e){}
       }
-      stopVoiceModeUI();
+      stopVoiceUI();
 
       const submissionTime = performance.now();
-      let calibratedSpeed = 1.1;
+      let calculatedPace = 1.0;
 
-      if (turnStartTimestamp !== null) {
-        const rawSeconds = (submissionTime - turnStartTimestamp) / 1000;
-        calibratedSpeed = calculateSpokenPace(rawSeconds, lastPartnerText, text, wasSpoken);
-        reactionTimes.push(calibratedSpeed);
-        document.getElementById("reactionDisplay").textContent = `⚡ ~${calibratedSpeed}s verbal pace`;
+      // If user responded while stopwatch was actively running, calculate precise pace.
+      // If responded during reading window, delivery was instant (<1.0s).
+      if (turnEngageTimestamp !== null) {
+        const rawSeconds = (submissionTime - turnEngageTimestamp) / 1000;
+        calculatedPace = parseFloat(Math.min(Math.max(rawSeconds, 0.8), 4.5).toFixed(1));
       } else {
-        calibratedSpeed = 1.1;
-        reactionTimes.push(calibratedSpeed);
-        document.getElementById("reactionDisplay").textContent = `⚡ ~1.1s pace`;
+        calculatedPace = 0.9;
       }
 
-      turnStartTimestamp = null;
+      reactionTimes.push(calculatedPace);
+      document.getElementById("reactionDisplay").className = "font-bold text-amber-400 font-mono";
+      document.getElementById("reactionDisplay").textContent = `⚡ ~${calculatedPace}s pace`;
+
+      turnEngageTimestamp = null;
       inputEl.value = "";
       inputEl.disabled = true;
       document.getElementById("sendBtn").disabled = true;
 
-      appendMessage("user", text, calibratedSpeed);
-      transcriptLog.push({ role: "user", text, latency: calibratedSpeed });
+      appendMessage("user", text, calculatedPace);
+      transcriptLog.push({ role: "user", text, latency: calculatedPace });
 
       const pool = SCENARIOS[currentTier];
       
@@ -701,7 +724,8 @@ CRITICAL RULES:
           document.getElementById("sendBtn").disabled = false;
           inputEl.focus();
           
-          startLiveStopwatch();
+          // Trigger reading countdown window first
+          startReadingCountdownThenStopwatch(partnerReply);
         } else {
           document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
           const avg = (reactionTimes.reduce((a,b)=>a+b,0)/reactionTimes.length).toFixed(1);
@@ -714,7 +738,6 @@ CRITICAL RULES:
         appendMessage("assistant", `[Error: ${err.message}]`);
         inputEl.disabled = false;
         document.getElementById("sendBtn").disabled = false;
-        startLiveStopwatch();
       }
     }
 
@@ -790,8 +813,8 @@ Return a JSON object with these exact keys:
 
     // Input focus triggers timer if not running
     document.getElementById("userInput").addEventListener("input", () => {
-      if (exchangesCount === 0 && turnStartTimestamp === null) {
-        turnStartTimestamp = performance.now();
+      if (exchangesCount === 0 && turnEngageTimestamp === null) {
+        turnEngageTimestamp = performance.now();
       }
     });
 
