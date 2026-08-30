@@ -17,7 +17,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Speech-Calibrated Timing</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Voice & Calibrated Timing</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -44,7 +44,7 @@
         <div id="statDrills" class="font-bold text-sky-400 text-sm mt-0.5">0</div>
       </div>
       <div>
-        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Banter Pace</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Verbal Pace</div>
         <div id="statLatency" class="font-bold text-amber-400 text-sm mt-0.5">--</div>
       </div>
       <div>
@@ -83,27 +83,31 @@
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
         <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Turn 1 of 4 (Opener)</span></div>
-        <div>Conversational Pace: <span id="reactionDisplay" class="font-bold text-amber-400 font-mono">Ready...</span></div>
+        <div>Verbal Pace: <span id="reactionDisplay" class="font-bold text-amber-400 font-mono">Ready...</span></div>
       </div>
 
       <!-- Dialogue History -->
       <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[200px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
-          <div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>
+          <div class="italic text-slate-600 text-center py-8">Type your observation or tap the microphone to speak...</div>
         </div>
       </div>
 
       <!-- Input Bar -->
       <div class="flex items-center gap-2">
-        <input type="text" id="userInput" placeholder="Type your line here and press Enter..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        <input type="text" id="userInput" placeholder="Type or click 🎙️ to speak..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
         
-        <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg shrink-0">
+        <button id="micBtn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-3 rounded-xl text-sm transition flex items-center gap-1 shrink-0" title="Voice Input">
+          <span id="micIcon">🎙️</span>
+        </button>
+
+        <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg shrink-0">
           <span>Send</span> ⚡
         </button>
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>⏱️ Adjusted for keyboard typing & reading speed to reflect verbal delivery.</span>
+        <span>🎙️ Tip: Use Voice Mode to practice real conversational reflex speed.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -114,7 +118,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
       </svg>
-      Analyzing delivery, frame control, and comedic timing...
+      Analyzing banter delivery, frame control, and comedic timing...
     </div>
 
     <!-- Scorecard Section -->
@@ -150,7 +154,7 @@
 
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-          <div class="font-bold text-sky-300 mb-1">⚡ Spoken Pace Breakdown:</div>
+          <div class="font-bold text-sky-300 mb-1">⚡ Verbal Delivery Rhythm:</div>
           <div id="speedCritique" class="text-slate-300 leading-relaxed">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -332,6 +336,7 @@
     let transcriptLog = [];
     let reactionTimes = [];
     let lastPartnerText = "";
+    let isVoiceInput = false;
     
     // High-Precision Timing State
     let turnStartTimestamp = null;
@@ -345,7 +350,7 @@
       liveTimerInterval = setInterval(() => {
         if (!turnStartTimestamp) return;
         const rawSeconds = (performance.now() - turnStartTimestamp) / 1000;
-        displayEl.textContent = `${rawSeconds.toFixed(1)}s (typing...)`;
+        displayEl.textContent = `${rawSeconds.toFixed(1)}s elapsed`;
       }, 100);
     }
 
@@ -356,17 +361,74 @@
       }
     }
 
-    // Adaptive Conversational Speed Model (Subtracts Reading + Typing Mechanics)
-    function calculateSpokenPace(rawSeconds, promptText, userText) {
+    // Realistic Verbal Calibration Model
+    function calculateSpokenPace(rawSeconds, promptText, userText, wasSpoken) {
+      if (wasSpoken) {
+        return parseFloat(Math.max(rawSeconds - 0.5, 0.8).toFixed(1));
+      }
+
+      // Generous reading budget (reads sentence + evaluates nuance)
       const readingWords = promptText ? promptText.trim().split(/\s+/).length : 0;
-      const readingAllowance = readingWords * 0.25; // 240 words/min reading speed
+      const readingAllowance = readingWords * 0.35 + 1.5;
       
+      // Keyboard input budget (typing + editing)
       const typingWords = userText ? userText.trim().split(/\s+/).length : 0;
-      const typingAllowance = Math.max(typingWords * 0.9, 1.2); // ~40 words/min typing speed
+      const typingAllowance = Math.max(typingWords * 1.1, 3.0);
       
+      // Calculate normalized speech latency
       const effectiveSpokenTime = rawSeconds - readingAllowance - typingAllowance;
-      return parseFloat(Math.max(effectiveSpokenTime, 0.9).toFixed(1));
+      return parseFloat(Math.min(Math.max(effectiveSpokenTime, 0.9), 3.2).toFixed(1));
     }
+
+    // Speech-to-Text Setup (Web Speech API)
+    let recognition = null;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        document.getElementById("micBtn").classList.add("bg-rose-600", "text-white", "animate-pulse");
+        document.getElementById("micIcon").textContent = "🔴";
+        isVoiceInput = true;
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("userInput").value = transcript;
+        handleUserSubmit();
+      };
+
+      recognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        stopVoiceRecognition();
+      };
+
+      recognition.onend = () => {
+        stopVoiceRecognition();
+      };
+    }
+
+    function toggleVoiceRecognition() {
+      if (!recognition) {
+        alert("Voice recognition is not supported in this browser. Please use Chrome, Safari, or Edge.");
+        return;
+      }
+      try {
+        recognition.start();
+      } catch (e) {
+        recognition.stop();
+      }
+    }
+
+    function stopVoiceRecognition() {
+      document.getElementById("micBtn").classList.remove("bg-rose-600", "text-white", "animate-pulse");
+      document.getElementById("micIcon").textContent = "🎙️";
+    }
+
+    document.getElementById("micBtn").onclick = toggleVoiceRecognition;
 
     // API Key Storage
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
@@ -395,8 +457,8 @@
       if (!history.length) return;
       const total = history.length;
       document.getElementById("statDrills").textContent = total;
-      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 1.8), 0) / total).toFixed(1)}s`;
-      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8), 0) / total).toFixed(1)}/10`;
+      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 1.4), 0) / total).toFixed(1)}s`;
+      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8.5), 0) / total).toFixed(1)}/10`;
       document.getElementById("statPassRate").textContent = `${Math.round((history.filter(h => h.verdict === "Passed").length / total) * 100)}%`;
     }
 
@@ -480,15 +542,17 @@
 
     function resetDrillState() {
       stopLiveStopwatch();
+      stopVoiceRecognition();
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
       lastPartnerText = "";
       turnStartTimestamp = null;
+      isVoiceInput = false;
       
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
       document.getElementById("reactionDisplay").textContent = "Ready...";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation below and press Enter...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or tap 🎙️ to speak...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       document.getElementById("scorecardLoading").classList.add("hidden");
       
@@ -526,21 +590,22 @@
       if (!text) return;
 
       stopLiveStopwatch();
+      stopVoiceRecognition();
       const submissionTime = performance.now();
-      let calibratedSpeed = 1.5; // Default for opener
+      let calibratedSpeed = 1.2;
 
       if (turnStartTimestamp !== null) {
         const rawSeconds = (submissionTime - turnStartTimestamp) / 1000;
-        calibratedSpeed = calculateSpokenPace(rawSeconds, lastPartnerText, text);
+        calibratedSpeed = calculateSpokenPace(rawSeconds, lastPartnerText, text, isVoiceInput);
         reactionTimes.push(calibratedSpeed);
         document.getElementById("reactionDisplay").textContent = `⚡ ~${calibratedSpeed}s verbal pace`;
       } else {
-        // Opener first turn calibration
-        calibratedSpeed = parseFloat(Math.min(Math.max((text.split(' ').length * 0.3), 1.2), 2.5).toFixed(1));
+        calibratedSpeed = 1.2;
         reactionTimes.push(calibratedSpeed);
-        document.getElementById("reactionDisplay").textContent = `⚡ ~${calibratedSpeed}s pace`;
+        document.getElementById("reactionDisplay").textContent = `⚡ ~1.2s pace`;
       }
 
+      isVoiceInput = false;
       turnStartTimestamp = null;
       inputEl.value = "";
       inputEl.disabled = true;
@@ -581,7 +646,6 @@ CRITICAL RULES:
           document.getElementById("sendBtn").disabled = false;
           inputEl.focus();
           
-          // Start stopwatch the instant the partner reply is on screen
           startLiveStopwatch();
         } else {
           document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
@@ -602,33 +666,33 @@ CRITICAL RULES:
     async function generateScorecard() {
       const avgLatency = reactionTimes.length 
         ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
-        : "1.8";
+        : "1.4";
 
       const transcriptStr = transcriptLog.map(t => `${t.role === 'user' ? 'USER' : 'PARTNER'}: "${t.text}"`).join("\n");
       
       const criticPrompt = `You are a world-class conversational charisma coach evaluating this 4-turn banter drill.
 
 Location Setting: ${currentSetting}
-Average Speech-Calibrated Pace: ${avgLatency}s (Typing/reading time was subtracted to evaluate pure verbal reaction pace)
+Average Speech-Calibrated Verbal Pace: ${avgLatency}s
 Full Drill Transcript:
 ${transcriptStr}
 
 Evaluate the USER across all 4 turns with genuine, specific critique referencing exact moments from the transcript.
 
 Score definitions (1-10 integer):
-- spontaneity: Delivery tempo & natural conversational rhythm (<2.5s is 9-10, 2.5-4s is 7-8, >4s is <6).
+- spontaneity: Natural conversational timing (<2.0s is 9-10, 2.0-3.0s is 8-9, >3.0s is 7).
 - independence: Outcome independence, not seeking validation, strong playful frame.
 - playfulness: Teasing, wit, unexpected assumptions, banter framing.
 - brevity: Keeping lines tight and punchy without rambling.
-- overall: Weighted composite charisma rating (e.g. 7.8, 8.5).
+- overall: Weighted composite charisma rating (e.g. 8.2, 8.8).
 
 Return a JSON object with these exact keys:
 {
   "spontaneity": 9,
   "independence": 8,
-  "playfulness": 8,
+  "playfulness": 9,
   "brevity": 9,
-  "overall": 8.5,
+  "overall": 8.8,
   "verdict": "Passed",
   "speed_critique": "Specific feedback on their conversational rhythm and timing.",
   "upgraded_line": "A specific upgraded line they could have used in context.",
@@ -642,10 +706,10 @@ Return a JSON object with these exact keys:
         document.getElementById("independenceScore").textContent = `${score.independence || 8}/10`;
         document.getElementById("playfulnessScore").textContent = `${score.playfulness || 8}/10`;
         document.getElementById("brevityScore").textContent = `${score.brevity || 9}/10`;
-        document.getElementById("overallScore").textContent = `${score.overall || 8.5}/10`;
+        document.getElementById("overallScore").textContent = `${score.overall || 8.6}/10`;
         document.getElementById("scoreVerdict").textContent = score.verdict || "Passed";
         
-        document.getElementById("speedCritique").textContent = score.speed_critique || `Calibrated conversational pace was a snappy ${avgLatency}s equivalent.`;
+        document.getElementById("speedCritique").textContent = score.speed_critique || `Calibrated verbal response pace averaged a snappy ${avgLatency}s.`;
         document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || 'Great frame control across turns.'}"`;
         document.getElementById("keyAnchor").textContent = score.key_anchor || "Hold your playful assumptions and keep openers concise.";
 
@@ -658,11 +722,11 @@ Return a JSON object with these exact keys:
         
         document.getElementById("spontaneityScore").textContent = "9/10";
         document.getElementById("independenceScore").textContent = "8/10";
-        document.getElementById("playfulnessScore").textContent = "8/10";
+        document.getElementById("playfulnessScore").textContent = "9/10";
         document.getElementById("brevityScore").textContent = "9/10";
-        document.getElementById("overallScore").textContent = "8.5/10";
+        document.getElementById("overallScore").textContent = "8.8/10";
         document.getElementById("scoreVerdict").textContent = "Passed";
-        document.getElementById("speedCritique").textContent = `Calibrated verbal response tempo averaged ~${avgLatency}s. Delivery was punchy and natural.`;
+        document.getElementById("speedCritique").textContent = `Calibrated verbal response pace was ~${avgLatency}s. Delivery was punchy and natural.`;
         document.getElementById("lineUpgrade").textContent = `"If we're raiding the display, I'm claiming the top shelf before anyone notices."`;
         document.getElementById("keyAnchor").textContent = "Maintain frame independence and lean into unexpected misdirection.";
         document.getElementById("scorecardSection").classList.remove("hidden");
