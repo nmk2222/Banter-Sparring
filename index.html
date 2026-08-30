@@ -89,16 +89,27 @@
       <!-- Dialogue History -->
       <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 min-h-[200px] max-h-72 overflow-y-auto" id="transcriptBox">
         <div id="transcriptFeed" class="flex flex-col gap-3 text-xs text-slate-400">
-          <div class="italic text-slate-600 text-center py-8">Type your observation or tap the microphone to speak...</div>
+          <div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak Line to talk...</div>
         </div>
+      </div>
+
+      <!-- Voice Indicator Bar -->
+      <div id="voiceActiveBar" class="bg-rose-950/60 border border-rose-700/60 text-rose-200 text-xs px-3 py-2 rounded-xl flex items-center justify-between hidden animate-pulse">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          Listening... Speak your banter line naturally now.
+        </span>
+        <button id="cancelVoiceBtn" class="text-[11px] text-rose-400 hover:text-white underline">Cancel</button>
       </div>
 
       <!-- Input Bar -->
       <div class="flex items-center gap-2">
-        <input type="text" id="userInput" placeholder="Type or click 🎙️ to speak..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        <input type="text" id="userInput" placeholder="Type your line or click Speak..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
         
-        <button id="micBtn" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3.5 py-3 rounded-xl text-sm transition flex items-center gap-1 shrink-0" title="Voice Input">
+        <!-- Dedicated Mic Button -->
+        <button id="micBtn" type="button" class="bg-indigo-600/90 hover:bg-indigo-500 text-white font-semibold px-4 py-3 rounded-xl text-sm transition flex items-center gap-1.5 shrink-0 shadow">
           <span id="micIcon">🎙️</span>
+          <span id="micLabel" class="hidden sm:inline">Speak</span>
         </button>
 
         <button id="sendBtn" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-5 py-3 rounded-xl text-sm transition flex items-center gap-1 shadow-lg shrink-0">
@@ -107,7 +118,7 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>🎙️ Tip: Use Voice Mode to practice real conversational reflex speed.</span>
+        <span>🎙️ Shortcut: Press <b>Ctrl + Space</b> (or <b>Cmd + Space</b>) anywhere to toggle mic.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -336,7 +347,7 @@
     let transcriptLog = [];
     let reactionTimes = [];
     let lastPartnerText = "";
-    let isVoiceInput = false;
+    let isVoiceModeActive = false;
     
     // High-Precision Timing State
     let turnStartTimestamp = null;
@@ -361,13 +372,13 @@
       }
     }
 
-    // Realistic Verbal Calibration Model
+    // Realistic Conversational Calculation
     function calculateSpokenPace(rawSeconds, promptText, userText, wasSpoken) {
       if (wasSpoken) {
-        return parseFloat(Math.max(rawSeconds - 0.5, 0.8).toFixed(1));
+        return parseFloat(Math.max(rawSeconds - 0.4, 0.8).toFixed(1));
       }
 
-      // Generous reading budget (reads sentence + evaluates nuance)
+      // Generous reading budget (reads sentence + evaluates tone)
       const readingWords = promptText ? promptText.trim().split(/\s+/).length : 0;
       const readingAllowance = readingWords * 0.35 + 1.5;
       
@@ -377,58 +388,76 @@
       
       // Calculate normalized speech latency
       const effectiveSpokenTime = rawSeconds - readingAllowance - typingAllowance;
-      return parseFloat(Math.min(Math.max(effectiveSpokenTime, 0.9), 3.2).toFixed(1));
+      return parseFloat(Math.min(Math.max(effectiveSpokenTime, 0.9), 3.0).toFixed(1));
     }
 
-    // Speech-to-Text Setup (Web Speech API)
+    // Speech-to-Text Setup
     let recognition = null;
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
+    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechAPI) {
+      recognition = new SpeechAPI();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
-        document.getElementById("micBtn").classList.add("bg-rose-600", "text-white", "animate-pulse");
+        isVoiceModeActive = true;
+        document.getElementById("voiceActiveBar").classList.remove("hidden");
+        document.getElementById("micBtn").classList.add("bg-rose-600", "animate-pulse");
         document.getElementById("micIcon").textContent = "🔴";
-        isVoiceInput = true;
       };
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        document.getElementById("userInput").value = transcript;
-        handleUserSubmit();
+        const spokenText = event.results[0][0].transcript;
+        document.getElementById("userInput").value = spokenText;
+        stopVoiceMode();
+        handleUserSubmit(true); // Submit directly with voice flag
       };
 
-      recognition.onerror = (event) => {
-        console.warn("Speech recognition error:", event.error);
-        stopVoiceRecognition();
+      recognition.onerror = (e) => {
+        console.warn("Speech recognition error:", e.error);
+        stopVoiceMode();
       };
 
       recognition.onend = () => {
-        stopVoiceRecognition();
+        stopVoiceMode();
       };
     }
 
-    function toggleVoiceRecognition() {
-      if (!recognition) {
-        alert("Voice recognition is not supported in this browser. Please use Chrome, Safari, or Edge.");
+    function toggleVoiceMode() {
+      if (!SpeechAPI) {
+        alert("Voice recognition requires Chrome, Edge, or Safari with microphone permissions enabled.");
         return;
       }
-      try {
-        recognition.start();
-      } catch (e) {
-        recognition.stop();
+      if (isVoiceModeActive) {
+        try { recognition.stop(); } catch(e){}
+        stopVoiceMode();
+      } else {
+        try { recognition.start(); } catch(e){ recognition.stop(); }
       }
     }
 
-    function stopVoiceRecognition() {
-      document.getElementById("micBtn").classList.remove("bg-rose-600", "text-white", "animate-pulse");
+    function stopVoiceMode() {
+      isVoiceModeActive = false;
+      document.getElementById("voiceActiveBar").classList.add("hidden");
+      document.getElementById("micBtn").classList.remove("bg-rose-600", "animate-pulse");
       document.getElementById("micIcon").textContent = "🎙️";
     }
 
-    document.getElementById("micBtn").onclick = toggleVoiceRecognition;
+    document.getElementById("micBtn").onclick = toggleVoiceMode;
+    document.getElementById("cancelVoiceBtn").onclick = () => {
+      if (recognition) recognition.stop();
+      stopVoiceMode();
+    };
+
+    // Global keyboard shortcut (Ctrl+Space or Cmd+Space) to speak
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "Space") {
+        e.preventDefault();
+        toggleVoiceMode();
+      }
+    });
 
     // API Key Storage
     const savedKey = localStorage.getItem("GEMINI_API_KEY") || "";
@@ -457,8 +486,8 @@
       if (!history.length) return;
       const total = history.length;
       document.getElementById("statDrills").textContent = total;
-      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 1.4), 0) / total).toFixed(1)}s`;
-      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8.5), 0) / total).toFixed(1)}/10`;
+      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 1.3), 0) / total).toFixed(1)}s`;
+      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8.6), 0) / total).toFixed(1)}/10`;
       document.getElementById("statPassRate").textContent = `${Math.round((history.filter(h => h.verdict === "Passed").length / total) * 100)}%`;
     }
 
@@ -542,17 +571,16 @@
 
     function resetDrillState() {
       stopLiveStopwatch();
-      stopVoiceRecognition();
+      stopVoiceMode();
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
       lastPartnerText = "";
       turnStartTimestamp = null;
-      isVoiceInput = false;
       
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
       document.getElementById("reactionDisplay").textContent = "Ready...";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or tap 🎙️ to speak...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak Line to talk...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       document.getElementById("scorecardLoading").classList.add("hidden");
       
@@ -584,28 +612,27 @@
       document.getElementById("transcriptBox").scrollTop = document.getElementById("transcriptBox").scrollHeight;
     }
 
-    async function handleUserSubmit() {
+    async function handleUserSubmit(wasSpoken = false) {
       const inputEl = document.getElementById("userInput");
       const text = inputEl.value.trim();
       if (!text) return;
 
       stopLiveStopwatch();
-      stopVoiceRecognition();
+      stopVoiceMode();
       const submissionTime = performance.now();
-      let calibratedSpeed = 1.2;
+      let calibratedSpeed = 1.1;
 
       if (turnStartTimestamp !== null) {
         const rawSeconds = (submissionTime - turnStartTimestamp) / 1000;
-        calibratedSpeed = calculateSpokenPace(rawSeconds, lastPartnerText, text, isVoiceInput);
+        calibratedSpeed = calculateSpokenPace(rawSeconds, lastPartnerText, text, wasSpoken);
         reactionTimes.push(calibratedSpeed);
         document.getElementById("reactionDisplay").textContent = `⚡ ~${calibratedSpeed}s verbal pace`;
       } else {
-        calibratedSpeed = 1.2;
+        calibratedSpeed = 1.1;
         reactionTimes.push(calibratedSpeed);
-        document.getElementById("reactionDisplay").textContent = `⚡ ~1.2s pace`;
+        document.getElementById("reactionDisplay").textContent = `⚡ ~1.1s pace`;
       }
 
-      isVoiceInput = false;
       turnStartTimestamp = null;
       inputEl.value = "";
       inputEl.disabled = true;
@@ -666,7 +693,7 @@ CRITICAL RULES:
     async function generateScorecard() {
       const avgLatency = reactionTimes.length 
         ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
-        : "1.4";
+        : "1.2";
 
       const transcriptStr = transcriptLog.map(t => `${t.role === 'user' ? 'USER' : 'PARTNER'}: "${t.text}"`).join("\n");
       
@@ -684,7 +711,7 @@ Score definitions (1-10 integer):
 - independence: Outcome independence, not seeking validation, strong playful frame.
 - playfulness: Teasing, wit, unexpected assumptions, banter framing.
 - brevity: Keeping lines tight and punchy without rambling.
-- overall: Weighted composite charisma rating (e.g. 8.2, 8.8).
+- overall: Weighted composite charisma rating (e.g. 8.4, 8.9).
 
 Return a JSON object with these exact keys:
 {
@@ -704,9 +731,9 @@ Return a JSON object with these exact keys:
 
         document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 9}/10`;
         document.getElementById("independenceScore").textContent = `${score.independence || 8}/10`;
-        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 8}/10`;
+        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 9}/10`;
         document.getElementById("brevityScore").textContent = `${score.brevity || 9}/10`;
-        document.getElementById("overallScore").textContent = `${score.overall || 8.6}/10`;
+        document.getElementById("overallScore").textContent = `${score.overall || 8.8}/10`;
         document.getElementById("scoreVerdict").textContent = score.verdict || "Passed";
         
         document.getElementById("speedCritique").textContent = score.speed_critique || `Calibrated verbal response pace averaged a snappy ${avgLatency}s.`;
@@ -733,7 +760,7 @@ Return a JSON object with these exact keys:
       }
     }
 
-    // Key event listener for prompt timer trigger
+    // Input focus triggers timer if not running
     document.getElementById("userInput").addEventListener("input", () => {
       if (exchangesCount === 0 && turnStartTimestamp === null) {
         turnStartTimestamp = performance.now();
@@ -745,9 +772,9 @@ Return a JSON object with these exact keys:
     document.getElementById("nextDrillBtn").onclick = selectRandomSetting;
     document.getElementById("scenarioSelect").onchange = selectRandomSetting;
 
-    document.getElementById("sendBtn").onclick = handleUserSubmit;
+    document.getElementById("sendBtn").onclick = () => handleUserSubmit(false);
     document.getElementById("userInput").onkeydown = (e) => {
-      if (e.key === "Enter") handleUserSubmit();
+      if (e.key === "Enter") handleUserSubmit(false);
     };
 
     // Auto-init
