@@ -17,7 +17,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Reading-Buffered Stopwatch</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Reading Buffer & Persistent Voice</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -97,7 +97,7 @@
       <div id="voiceActiveBar" class="bg-rose-950/80 border border-rose-600 text-rose-200 text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-between hidden">
         <span class="flex items-center gap-2 font-medium">
           <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-          Recording continuously... Click "Done Speaking" to stop & submit.
+          Recording actively... Click "Done Speaking" when you are finished.
         </span>
         <button id="cancelVoiceBtn" class="text-[11px] text-rose-300 hover:text-white underline">Cancel</button>
       </div>
@@ -118,7 +118,7 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>⏱️ Reading Buffer: Visible countdown gives you full reading time before stopwatch starts.</span>
+        <span>🎙️ Toggle Mic: Click once to record, click again to stop & submit. Never auto-stops on pauses.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -348,11 +348,11 @@
     let reactionTimes = [];
     let lastPartnerText = "";
     
-    // Voice State Flags
-    let isVoiceRecording = false;
-    let finalAccumulatedSpeech = "";
+    // Voice State Flags (Controlled strictly by user clicks)
+    let isUserRecording = false;
+    let accumulatedFinalSpeech = "";
     
-    // Explicit Reading Buffer & Stopwatch State
+    // Reading Buffer & Stopwatch State
     let turnEngageTimestamp = null;
     let readingCountdownInterval = null;
     let stopwatchInterval = null;
@@ -361,9 +361,8 @@
       clearAllTimers();
       const displayEl = document.getElementById("reactionDisplay");
       
-      // Calculate reading allowance: slow-medium (160 wpm = 0.38s/word) + 2.5s base cognitive buffer
       const wordCount = partnerText ? partnerText.trim().split(/\s+/).length : 0;
-      let remainingSeconds = Math.max(Math.ceil((wordCount * 0.38) + 2.5), 4);
+      let remainingSeconds = Math.max(Math.ceil((wordCount * 0.40) + 2.5), 4);
       
       displayEl.className = "font-bold text-sky-400 font-mono";
       displayEl.textContent = `📖 Reading: ${remainingSeconds}s...`;
@@ -403,7 +402,7 @@
       }
     }
 
-    // Continuous Speech-to-Text with Persistent Auto-Revival
+    // Bulletproof Persistent Voice Engine
     let recognition = null;
     const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -418,22 +417,23 @@
         let interim = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalAccumulatedSpeech += event.results[i][0].transcript + " ";
+            accumulatedFinalSpeech += event.results[i][0].transcript + " ";
           } else {
             interim += event.results[i][0].transcript;
           }
         }
-        document.getElementById("userInput").value = (finalAccumulatedSpeech + interim).trim();
+        document.getElementById("userInput").value = (accumulatedFinalSpeech + interim).trim();
       };
 
-      recognition.onerror = (e) => {
-        if (e.error === 'no-speech' && isVoiceRecording) {
+      // Crucial: Auto-revive on any pause/silence timeout unless user explicitly clicked stop
+      recognition.onend = () => {
+        if (isUserRecording) {
           try { recognition.start(); } catch(err){}
         }
       };
 
-      recognition.onend = () => {
-        if (isVoiceRecording) {
+      recognition.onerror = (e) => {
+        if (isUserRecording) {
           try { recognition.start(); } catch(err){}
         }
       };
@@ -447,8 +447,9 @@
         return;
       }
 
-      if (isVoiceRecording) {
-        isVoiceRecording = false;
+      if (isUserRecording) {
+        // Stop recording permanently on 2nd click
+        isUserRecording = false;
         try { recognition.stop(); } catch(e){}
         stopVoiceUI();
 
@@ -456,8 +457,9 @@
           handleUserSubmit(true);
         }
       } else {
-        isVoiceRecording = true;
-        finalAccumulatedSpeech = "";
+        // Start persistent recording on 1st click
+        isUserRecording = true;
+        accumulatedFinalSpeech = "";
         document.getElementById("userInput").value = "";
         
         try { 
@@ -485,7 +487,7 @@
 
     document.getElementById("micBtn").onclick = toggleVoiceRecording;
     document.getElementById("cancelVoiceBtn").onclick = () => {
-      isVoiceRecording = false;
+      isUserRecording = false;
       try { recognition.stop(); } catch(e){}
       stopVoiceUI();
       document.getElementById("userInput").value = "";
@@ -611,7 +613,7 @@
 
     function resetDrillState() {
       clearAllTimers();
-      isVoiceRecording = false;
+      isUserRecording = false;
       if (recognition) try { recognition.stop(); } catch(e){}
       stopVoiceUI();
 
@@ -662,8 +664,8 @@
       if (!text) return;
 
       clearAllTimers();
-      if (isVoiceRecording) {
-        isVoiceRecording = false;
+      if (isUserRecording) {
+        isUserRecording = false;
         try { recognition.stop(); } catch(e){}
       }
       stopVoiceUI();
@@ -671,8 +673,6 @@
       const submissionTime = performance.now();
       let calculatedPace = 1.0;
 
-      // If user responded while stopwatch was actively running, calculate precise pace.
-      // If responded during reading window, delivery was instant (<1.0s).
       if (turnEngageTimestamp !== null) {
         const rawSeconds = (submissionTime - turnEngageTimestamp) / 1000;
         calculatedPace = parseFloat(Math.min(Math.max(rawSeconds, 0.8), 4.5).toFixed(1));
@@ -724,7 +724,6 @@ CRITICAL RULES:
           document.getElementById("sendBtn").disabled = false;
           inputEl.focus();
           
-          // Trigger reading countdown window first
           startReadingCountdownThenStopwatch(partnerReply);
         } else {
           document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
