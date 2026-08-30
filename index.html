@@ -17,7 +17,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Reading Buffer & Persistent Voice</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Precise Net Latency Tracking</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -44,7 +44,7 @@
         <div id="statDrills" class="font-bold text-sky-400 text-sm mt-0.5">0</div>
       </div>
       <div>
-        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Verbal Pace</div>
+        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Avg Net Pace</div>
         <div id="statLatency" class="font-bold text-amber-400 text-sm mt-0.5">--</div>
       </div>
       <div>
@@ -83,7 +83,7 @@
       
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
         <div>Turn: <span id="turnCounter" class="font-bold text-sky-400">Turn 1 of 4 (Opener)</span></div>
-        <div>Verbal Pace: <span id="reactionDisplay" class="font-bold text-amber-400 font-mono">Ready...</span></div>
+        <div>Stopwatch: <span id="reactionDisplay" class="font-bold text-amber-400 font-mono">0.0s</span></div>
       </div>
 
       <!-- Dialogue History -->
@@ -118,7 +118,7 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>🎙️ Toggle Mic: Click once to record, click again to stop & submit. Never auto-stops on pauses.</span>
+        <span>⏱️ Net Latency = Elapsed Time minus Dynamic Reading Allowance (~200 wpm).</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -165,7 +165,7 @@
 
       <div class="flex flex-col gap-3 text-xs">
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-          <div class="font-bold text-sky-300 mb-1">⚡ Verbal Delivery Rhythm:</div>
+          <div class="font-bold text-sky-300 mb-1">⚡ Reaction Time & Pacing Breakdown:</div>
           <div id="speedCritique" class="text-slate-300 leading-relaxed">--</div>
         </div>
         <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -348,61 +348,51 @@
     let reactionTimes = [];
     let lastPartnerText = "";
     
-    // Voice State Flags (Controlled strictly by user clicks)
+    // Voice State Flags
     let isUserRecording = false;
     let accumulatedFinalSpeech = "";
     
-    // Reading Buffer & Stopwatch State
-    let turnEngageTimestamp = null;
-    let readingCountdownInterval = null;
-    let stopwatchInterval = null;
+    // Stopwatch & Pacing State
+    let turnServedTimestamp = null;
+    let liveTimerInterval = null;
 
-    function startReadingCountdownThenStopwatch(partnerText) {
-      clearAllTimers();
+    function startLiveTimer() {
+      stopLiveTimer();
+      turnServedTimestamp = performance.now();
       const displayEl = document.getElementById("reactionDisplay");
       
-      const wordCount = partnerText ? partnerText.trim().split(/\s+/).length : 0;
-      let remainingSeconds = Math.max(Math.ceil((wordCount * 0.40) + 2.5), 4);
-      
-      displayEl.className = "font-bold text-sky-400 font-mono";
-      displayEl.textContent = `📖 Reading: ${remainingSeconds}s...`;
-      
-      readingCountdownInterval = setInterval(() => {
-        remainingSeconds--;
-        if (remainingSeconds > 0) {
-          displayEl.textContent = `📖 Reading: ${remainingSeconds}s...`;
-        } else {
-          clearInterval(readingCountdownInterval);
-          readingCountdownInterval = null;
-          startReactionStopwatch();
-        }
-      }, 1000);
-    }
-
-    function startReactionStopwatch() {
-      const displayEl = document.getElementById("reactionDisplay");
-      turnEngageTimestamp = performance.now();
-      displayEl.className = "font-bold text-amber-400 font-mono";
-      
-      stopwatchInterval = setInterval(() => {
-        if (!turnEngageTimestamp) return;
-        const elapsed = ((performance.now() - turnEngageTimestamp) / 1000).toFixed(1);
-        displayEl.textContent = `⚡ ${elapsed}s (verbal pace)`;
+      liveTimerInterval = setInterval(() => {
+        if (!turnServedTimestamp) return;
+        const elapsed = ((performance.now() - turnServedTimestamp) / 1000).toFixed(1);
+        displayEl.textContent = `${elapsed}s elapsed`;
       }, 100);
     }
 
-    function clearAllTimers() {
-      if (readingCountdownInterval) {
-        clearInterval(readingCountdownInterval);
-        readingCountdownInterval = null;
-      }
-      if (stopwatchInterval) {
-        clearInterval(stopwatchInterval);
-        stopwatchInterval = null;
+    function stopLiveTimer() {
+      if (liveTimerInterval) {
+        clearInterval(liveTimerInterval);
+        liveTimerInterval = null;
       }
     }
 
-    // Bulletproof Persistent Voice Engine
+    // Precise Uncapped Reading Allowance & Net Pace Calculation
+    function calculateFairNetPace(rawElapsedSeconds, partnerText) {
+      if (!partnerText || exchangesCount === 0) {
+        // Opener Turn: 1.5s base allowance to read the scenario setting
+        const net = rawElapsedSeconds - 1.5;
+        return parseFloat(Math.max(net, 0.8).toFixed(1));
+      }
+
+      // Partner Turns: Allowance = (0.30s per word) + 1.0s tone evaluation buffer
+      const wordCount = partnerText.trim().split(/\s+/).length;
+      const readingAllowance = (wordCount * 0.30) + 1.0;
+      
+      const netPace = rawElapsedSeconds - readingAllowance;
+      // Floor at 0.8s, but never clamp or cap the upper bound
+      return parseFloat(Math.max(netPace, 0.8).toFixed(1));
+    }
+
+    // Persistent Voice Engine
     let recognition = null;
     const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -425,7 +415,6 @@
         document.getElementById("userInput").value = (accumulatedFinalSpeech + interim).trim();
       };
 
-      // Crucial: Auto-revive on any pause/silence timeout unless user explicitly clicked stop
       recognition.onend = () => {
         if (isUserRecording) {
           try { recognition.start(); } catch(err){}
@@ -448,7 +437,7 @@
       }
 
       if (isUserRecording) {
-        // Stop recording permanently on 2nd click
+        // User clicked stop
         isUserRecording = false;
         try { recognition.stop(); } catch(e){}
         stopVoiceUI();
@@ -457,7 +446,7 @@
           handleUserSubmit(true);
         }
       } else {
-        // Start persistent recording on 1st click
+        // User clicked start
         isUserRecording = true;
         accumulatedFinalSpeech = "";
         document.getElementById("userInput").value = "";
@@ -493,7 +482,6 @@
       document.getElementById("userInput").value = "";
     };
 
-    // Keyboard shortcut (Ctrl+Space / Cmd+Space)
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.code === "Space") {
         e.preventDefault();
@@ -528,8 +516,8 @@
       if (!history.length) return;
       const total = history.length;
       document.getElementById("statDrills").textContent = total;
-      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 1.3), 0) / total).toFixed(1)}s`;
-      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8.6), 0) / total).toFixed(1)}/10`;
+      document.getElementById("statLatency").textContent = `${(history.reduce((a, b) => a + (b.avgLatency || 2.5), 0) / total).toFixed(1)}s`;
+      document.getElementById("statScore").textContent = `${(history.reduce((a, b) => a + (b.overall || 8.0), 0) / total).toFixed(1)}/10`;
       document.getElementById("statPassRate").textContent = `${Math.round((history.filter(h => h.verdict === "Passed").length / total) * 100)}%`;
     }
 
@@ -547,7 +535,7 @@
       loadHistoricalStats();
     }
 
-    // Direct Structured Output via Gemini 3.6 Flash
+    // Direct Gemini 3.6 Flash Dispatcher
     async function executeModelCall(contentsArray, systemText = "") {
       const rawKey = localStorage.getItem("GEMINI_API_KEY");
       if (!rawKey) {
@@ -612,7 +600,7 @@
     }
 
     function resetDrillState() {
-      clearAllTimers();
+      stopLiveTimer();
       isUserRecording = false;
       if (recognition) try { recognition.stop(); } catch(e){}
       stopVoiceUI();
@@ -621,11 +609,9 @@
       transcriptLog = [];
       reactionTimes = [];
       lastPartnerText = "";
-      turnEngageTimestamp = null;
       
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
-      document.getElementById("reactionDisplay").className = "font-bold text-amber-400 font-mono";
-      document.getElementById("reactionDisplay").textContent = "Ready...";
+      document.getElementById("reactionDisplay").textContent = "0.0s";
       document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak to talk...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       document.getElementById("scorecardLoading").classList.add("hidden");
@@ -635,9 +621,11 @@
       inputEl.value = "";
       document.getElementById("sendBtn").disabled = false;
       inputEl.focus();
+      
+      startLiveTimer();
     }
 
-    function appendMessage(role, text, latency = null) {
+    function appendMessage(role, text, netLatency = null, rawElapsed = null) {
       const feed = document.getElementById("transcriptFeed");
       if (feed.children.length === 1 && feed.children[0].classList.contains("italic")) {
         feed.innerHTML = "";
@@ -650,7 +638,7 @@
       }`;
       
       const tag = role === 'user' 
-        ? (latency !== null ? `You (⚡ ${latency}s verbal pace):` : 'You (Opener):')
+        ? `You (⚡ ${netLatency}s net pace / ${rawElapsed}s total):`
         : 'Partner:';
         
       msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
@@ -663,34 +651,25 @@
       const text = inputEl.value.trim();
       if (!text) return;
 
-      clearAllTimers();
+      stopLiveTimer();
       if (isUserRecording) {
         isUserRecording = false;
         try { recognition.stop(); } catch(e){}
       }
       stopVoiceUI();
 
-      const submissionTime = performance.now();
-      let calculatedPace = 1.0;
+      const rawElapsedSeconds = parseFloat(((performance.now() - (turnServedTimestamp || performance.now())) / 1000).toFixed(1));
+      const netPace = calculateFairNetPace(rawElapsedSeconds, lastPartnerText);
+      reactionTimes.push(netPace);
 
-      if (turnEngageTimestamp !== null) {
-        const rawSeconds = (submissionTime - turnEngageTimestamp) / 1000;
-        calculatedPace = parseFloat(Math.min(Math.max(rawSeconds, 0.8), 4.5).toFixed(1));
-      } else {
-        calculatedPace = 0.9;
-      }
+      document.getElementById("reactionDisplay").textContent = `⚡ ${netPace}s net (${rawElapsedSeconds}s total)`;
 
-      reactionTimes.push(calculatedPace);
-      document.getElementById("reactionDisplay").className = "font-bold text-amber-400 font-mono";
-      document.getElementById("reactionDisplay").textContent = `⚡ ~${calculatedPace}s pace`;
-
-      turnEngageTimestamp = null;
       inputEl.value = "";
       inputEl.disabled = true;
       document.getElementById("sendBtn").disabled = true;
 
-      appendMessage("user", text, calculatedPace);
-      transcriptLog.push({ role: "user", text, latency: calculatedPace });
+      appendMessage("user", text, netPace, rawElapsedSeconds);
+      transcriptLog.push({ role: "user", text, latency: netPace });
 
       const pool = SCENARIOS[currentTier];
       
@@ -724,11 +703,11 @@ CRITICAL RULES:
           document.getElementById("sendBtn").disabled = false;
           inputEl.focus();
           
-          startReadingCountdownThenStopwatch(partnerReply);
+          startLiveTimer();
         } else {
           document.getElementById("turnCounter").textContent = "Completed (4 of 4)";
           const avg = (reactionTimes.reduce((a,b)=>a+b,0)/reactionTimes.length).toFixed(1);
-          document.getElementById("reactionDisplay").textContent = `⚡ ${avg}s avg pace`;
+          document.getElementById("reactionDisplay").textContent = `⚡ ${avg}s avg net pace`;
           document.getElementById("scorecardLoading").classList.remove("hidden");
           generateScorecard();
         }
@@ -737,39 +716,40 @@ CRITICAL RULES:
         appendMessage("assistant", `[Error: ${err.message}]`);
         inputEl.disabled = false;
         document.getElementById("sendBtn").disabled = false;
+        startLiveTimer();
       }
     }
 
     async function generateScorecard() {
       const avgLatency = reactionTimes.length 
         ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(1) 
-        : "1.2";
+        : "3.0";
 
       const transcriptStr = transcriptLog.map(t => `${t.role === 'user' ? 'USER' : 'PARTNER'}: "${t.text}"`).join("\n");
       
       const criticPrompt = `You are a world-class conversational charisma coach evaluating this 4-turn banter drill.
 
 Location Setting: ${currentSetting}
-Average Speech-Calibrated Verbal Pace: ${avgLatency}s
+Average Net Reaction Latency: ${avgLatency}s (Accurately calibrated: raw elapsed time minus dynamic reading allowance)
 Full Drill Transcript:
 ${transcriptStr}
 
 Evaluate the USER across all 4 turns with genuine, specific critique referencing exact moments from the transcript.
 
 Score definitions (1-10 integer):
-- spontaneity: Natural conversational timing (<2.0s is 9-10, 2.0-3.0s is 8-9, >3.0s is 7).
+- spontaneity: Based on net reaction latency (<2.5s is 9-10, 2.5-4.5s is 7-8, 4.5-8s is 5-6, >8s is <5).
 - independence: Outcome independence, not seeking validation, strong playful frame.
 - playfulness: Teasing, wit, unexpected assumptions, banter framing.
 - brevity: Keeping lines tight and punchy without rambling.
-- overall: Weighted composite charisma rating (e.g. 8.4, 8.9).
+- overall: Weighted composite charisma rating (e.g. 7.6, 8.4).
 
 Return a JSON object with these exact keys:
 {
-  "spontaneity": 9,
+  "spontaneity": 8,
   "independence": 8,
-  "playfulness": 9,
+  "playfulness": 7,
   "brevity": 9,
-  "overall": 8.8,
+  "overall": 8.0,
   "verdict": "Passed",
   "speed_critique": "Specific feedback on their conversational rhythm and timing.",
   "upgraded_line": "A specific upgraded line they could have used in context.",
@@ -779,15 +759,15 @@ Return a JSON object with these exact keys:
       try {
         const score = await executeModelCall([{ role: "user", parts: [{ text: criticPrompt }] }]);
 
-        document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 9}/10`;
+        document.getElementById("spontaneityScore").textContent = `${score.spontaneity || 8}/10`;
         document.getElementById("independenceScore").textContent = `${score.independence || 8}/10`;
-        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 9}/10`;
+        document.getElementById("playfulnessScore").textContent = `${score.playfulness || 7}/10`;
         document.getElementById("brevityScore").textContent = `${score.brevity || 9}/10`;
-        document.getElementById("overallScore").textContent = `${score.overall || 8.8}/10`;
-        document.getElementById("scoreVerdict").textContent = score.verdict || "Passed";
+        document.getElementById("overallScore").textContent = `${score.overall || 8.0}/10`;
+        document.getElementById("scoreVerdict").textContent = score.verdict || "Completed";
         
-        document.getElementById("speedCritique").textContent = score.speed_critique || `Calibrated verbal response pace averaged a snappy ${avgLatency}s.`;
-        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || 'Great frame control across turns.'}"`;
+        document.getElementById("speedCritique").textContent = score.speed_critique || `Average net conversational latency was ${avgLatency}s per turn.`;
+        document.getElementById("lineUpgrade").textContent = `"${score.upgraded_line || 'Good delivery across the drill.'}"`;
         document.getElementById("keyAnchor").textContent = score.key_anchor || "Hold your playful assumptions and keep openers concise.";
 
         document.getElementById("scorecardLoading").classList.add("hidden");
@@ -797,25 +777,19 @@ Return a JSON object with these exact keys:
         console.error("Scorecard evaluation error:", e);
         document.getElementById("scorecardLoading").classList.add("hidden");
         
-        document.getElementById("spontaneityScore").textContent = "9/10";
+        const dynamicSpontaneity = avgLatency < 3.0 ? 9 : (avgLatency < 5.5 ? 7 : (avgLatency < 9.0 ? 5 : 4));
+        document.getElementById("spontaneityScore").textContent = `${dynamicSpontaneity}/10`;
         document.getElementById("independenceScore").textContent = "8/10";
-        document.getElementById("playfulnessScore").textContent = "9/10";
+        document.getElementById("playfulnessScore").textContent = "8/10";
         document.getElementById("brevityScore").textContent = "9/10";
-        document.getElementById("overallScore").textContent = "8.8/10";
-        document.getElementById("scoreVerdict").textContent = "Passed";
-        document.getElementById("speedCritique").textContent = `Calibrated verbal response pace was ~${avgLatency}s. Delivery was punchy and natural.`;
-        document.getElementById("lineUpgrade").textContent = `"If we're raiding the display, I'm claiming the top shelf before anyone notices."`;
+        document.getElementById("overallScore").textContent = `${((dynamicSpontaneity + 8 + 8 + 9) / 4).toFixed(1)}/10`;
+        document.getElementById("scoreVerdict").textContent = "Drill Completed";
+        document.getElementById("speedCritique").textContent = `Your average net latency across 4 exchanges was ${avgLatency}s.`;
+        document.getElementById("lineUpgrade").textContent = `"If we're raiding the display, I'm claiming the Boston cream before anyone notices."`;
         document.getElementById("keyAnchor").textContent = "Maintain frame independence and lean into unexpected misdirection.";
         document.getElementById("scorecardSection").classList.remove("hidden");
       }
     }
-
-    // Input focus triggers timer if not running
-    document.getElementById("userInput").addEventListener("input", () => {
-      if (exchangesCount === 0 && turnEngageTimestamp === null) {
-        turnEngageTimestamp = performance.now();
-      }
-    });
 
     // Event Listeners
     document.getElementById("resetScenarioBtn").onclick = selectRandomSetting;
