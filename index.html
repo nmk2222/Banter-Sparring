@@ -17,7 +17,7 @@
         <h1 class="text-2xl font-bold flex items-center gap-2 text-sky-400">
           ⚡ Charisma & Banter Lab
         </h1>
-        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Voice & Calibrated Timing</p>
+        <p class="text-xs text-slate-400 mt-0.5">7 Tiers • 140 Scenarios • Continuous Voice Dictation</p>
       </div>
       <button id="toggleKeyBtn" class="text-xs px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:border-sky-500 transition flex items-center gap-1.5">
         <span id="keyStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -93,21 +93,21 @@
         </div>
       </div>
 
-      <!-- Voice Indicator Bar -->
-      <div id="voiceActiveBar" class="bg-rose-950/60 border border-rose-700/60 text-rose-200 text-xs px-3 py-2 rounded-xl flex items-center justify-between hidden animate-pulse">
-        <span class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-          Listening... Speak your banter line naturally now.
+      <!-- Voice Status Banner -->
+      <div id="voiceActiveBar" class="bg-rose-950/80 border border-rose-600 text-rose-200 text-xs px-3.5 py-2.5 rounded-xl flex items-center justify-between hidden">
+        <span class="flex items-center gap-2 font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+          Recording active... Click "Done Speaking" or press Send when finished.
         </span>
-        <button id="cancelVoiceBtn" class="text-[11px] text-rose-400 hover:text-white underline">Cancel</button>
+        <button id="cancelVoiceBtn" class="text-[11px] text-rose-300 hover:text-white underline">Cancel</button>
       </div>
 
       <!-- Input Bar -->
       <div class="flex items-center gap-2">
-        <input type="text" id="userInput" placeholder="Type your line or click Speak..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
+        <input type="text" id="userInput" placeholder="Type or click Speak to record..." class="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm flex-1 text-white focus:outline-none focus:border-sky-500" autocomplete="off">
         
-        <!-- Dedicated Mic Button -->
-        <button id="micBtn" type="button" class="bg-indigo-600/90 hover:bg-indigo-500 text-white font-semibold px-4 py-3 rounded-xl text-sm transition flex items-center gap-1.5 shrink-0 shadow">
+        <!-- Toggle Mic Button -->
+        <button id="micBtn" type="button" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-3 rounded-xl text-sm transition flex items-center gap-1.5 shrink-0 shadow">
           <span id="micIcon">🎙️</span>
           <span id="micLabel" class="hidden sm:inline">Speak</span>
         </button>
@@ -118,7 +118,7 @@
       </div>
 
       <div class="flex justify-between items-center text-[11px] text-slate-500 px-1">
-        <span>🎙️ Shortcut: Press <b>Ctrl + Space</b> (or <b>Cmd + Space</b>) anywhere to toggle mic.</span>
+        <span>🎙️ Continuous Recording: Click mic once to start, click again to stop & send.</span>
         <button id="resetScenarioBtn" class="text-sky-400 hover:underline">🔄 New Scenario</button>
       </div>
     </div>
@@ -348,6 +348,7 @@
     let reactionTimes = [];
     let lastPartnerText = "";
     let isVoiceModeActive = false;
+    let finalSpokenText = "";
     
     // High-Precision Timing State
     let turnStartTimestamp = null;
@@ -375,53 +376,61 @@
     // Realistic Conversational Calculation
     function calculateSpokenPace(rawSeconds, promptText, userText, wasSpoken) {
       if (wasSpoken) {
-        return parseFloat(Math.max(rawSeconds - 0.4, 0.8).toFixed(1));
+        return parseFloat(Math.max(rawSeconds - 0.5, 0.8).toFixed(1));
       }
 
-      // Generous reading budget (reads sentence + evaluates tone)
       const readingWords = promptText ? promptText.trim().split(/\s+/).length : 0;
       const readingAllowance = readingWords * 0.35 + 1.5;
       
-      // Keyboard input budget (typing + editing)
       const typingWords = userText ? userText.trim().split(/\s+/).length : 0;
       const typingAllowance = Math.max(typingWords * 1.1, 3.0);
       
-      // Calculate normalized speech latency
       const effectiveSpokenTime = rawSeconds - readingAllowance - typingAllowance;
       return parseFloat(Math.min(Math.max(effectiveSpokenTime, 0.9), 3.0).toFixed(1));
     }
 
-    // Speech-to-Text Setup
+    // Continuous Speech-to-Text Setup with Manual Toggle Control
     let recognition = null;
     const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechAPI) {
       recognition = new SpeechAPI();
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true; // DO NOT stop on audio pauses
+      recognition.interimResults = true; // Stream words in real-time
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
         isVoiceModeActive = true;
+        finalSpokenText = "";
         document.getElementById("voiceActiveBar").classList.remove("hidden");
-        document.getElementById("micBtn").classList.add("bg-rose-600", "animate-pulse");
-        document.getElementById("micIcon").textContent = "🔴";
+        document.getElementById("micBtn").classList.add("bg-rose-600", "hover:bg-rose-500", "animate-pulse");
+        document.getElementById("micIcon").textContent = "⏹️";
+        document.getElementById("micLabel").textContent = "Done Speaking";
       };
 
       recognition.onresult = (event) => {
-        const spokenText = event.results[0][0].transcript;
-        document.getElementById("userInput").value = spokenText;
-        stopVoiceMode();
-        handleUserSubmit(true); // Submit directly with voice flag
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalSpokenText += event.results[i][0].transcript + " ";
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        document.getElementById("userInput").value = (finalSpokenText + interimTranscript).trim();
       };
 
       recognition.onerror = (e) => {
-        console.warn("Speech recognition error:", e.error);
-        stopVoiceMode();
+        if (e.error !== 'no-speech') {
+          console.warn("Speech recognition error:", e.error);
+        }
       };
 
       recognition.onend = () => {
-        stopVoiceMode();
+        // If still flagged as active (e.g. system timeout), keep listening
+        if (isVoiceModeActive) {
+          try { recognition.start(); } catch(err){}
+        }
       };
     }
 
@@ -430,28 +439,39 @@
         alert("Voice recognition requires Chrome, Edge, or Safari with microphone permissions enabled.");
         return;
       }
+      
       if (isVoiceModeActive) {
+        // Manual stop action -> finalize transcript & send line
+        isVoiceModeActive = false;
         try { recognition.stop(); } catch(e){}
-        stopVoiceMode();
+        stopVoiceModeUI();
+        
+        if (document.getElementById("userInput").value.trim().length > 0) {
+          handleUserSubmit(true);
+        }
       } else {
+        // Start recording
+        document.getElementById("userInput").value = "";
         try { recognition.start(); } catch(e){ recognition.stop(); }
       }
     }
 
-    function stopVoiceMode() {
-      isVoiceModeActive = false;
+    function stopVoiceModeUI() {
       document.getElementById("voiceActiveBar").classList.add("hidden");
-      document.getElementById("micBtn").classList.remove("bg-rose-600", "animate-pulse");
+      document.getElementById("micBtn").classList.remove("bg-rose-600", "hover:bg-rose-500", "animate-pulse");
       document.getElementById("micIcon").textContent = "🎙️";
+      document.getElementById("micLabel").textContent = "Speak";
     }
 
     document.getElementById("micBtn").onclick = toggleVoiceMode;
     document.getElementById("cancelVoiceBtn").onclick = () => {
+      isVoiceModeActive = false;
       if (recognition) recognition.stop();
-      stopVoiceMode();
+      stopVoiceModeUI();
+      document.getElementById("userInput").value = "";
     };
 
-    // Global keyboard shortcut (Ctrl+Space or Cmd+Space) to speak
+    // Keyboard shortcut (Ctrl+Space or Cmd+Space) to toggle voice dictation
     window.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.code === "Space") {
         e.preventDefault();
@@ -571,7 +591,10 @@
 
     function resetDrillState() {
       stopLiveStopwatch();
-      stopVoiceMode();
+      isVoiceModeActive = false;
+      if (recognition) try { recognition.stop(); } catch(e){}
+      stopVoiceModeUI();
+
       exchangesCount = 0;
       transcriptLog = [];
       reactionTimes = [];
@@ -580,7 +603,7 @@
       
       document.getElementById("turnCounter").textContent = "Turn 1 of 4 (Opener)";
       document.getElementById("reactionDisplay").textContent = "Ready...";
-      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak Line to talk...</div>';
+      document.getElementById("transcriptFeed").innerHTML = '<div class="italic text-slate-600 text-center py-8">Type your observation or click 🎙️ Speak to talk...</div>';
       document.getElementById("scorecardSection").classList.add("hidden");
       document.getElementById("scorecardLoading").classList.add("hidden");
       
@@ -604,7 +627,7 @@
       }`;
       
       const tag = role === 'user' 
-        ? (latency !== null ? `You (⚡ ${latency}s verbal pace):` : 'You (Opener):')
+        ? (latency !== null ? `You (⚡ ${latency}s pace):` : 'You (Opener):')
         : 'Partner:';
         
       msg.innerHTML = `<span class="font-bold opacity-75">${tag}</span> ${text}`;
@@ -618,7 +641,12 @@
       if (!text) return;
 
       stopLiveStopwatch();
-      stopVoiceMode();
+      if (isVoiceModeActive) {
+        isVoiceModeActive = false;
+        if (recognition) try { recognition.stop(); } catch(e){}
+      }
+      stopVoiceModeUI();
+
       const submissionTime = performance.now();
       let calibratedSpeed = 1.1;
 
